@@ -753,24 +753,22 @@ export default function App() {
                                     <span>Optimal Premium Decay (Max profit: 100%)</span>
                                   </div>
                                   
-                                  <div className="h-2.5 rounded-full bg-[#05070e] overflow-hidden flex relative border border-white/5">
+                                  <div className="h-2.5 rounded-full bg-[#05070e] overflow-hidden relative border border-white/5">
                                     {decayPct < 0 ? (
-                                      /* Loss Zone (Bar expands leftwards / red zone) */
-                                      <div className="w-full flex justify-end">
-                                        <div 
-                                          className="h-full bg-gradient-to-l from-rose-500 to-rose-700/60 rounded-full transition-all duration-300 shadow-[0_0_10px_rgba(239,68,68,0.5)]"
-                                          style={{ width: `${Math.min(Math.abs(decayPct), 100)}%` }}
-                                        ></div>
-                                      </div>
-                                    ) : (
-                                      /* Profit Zone (Bar expands rightwards / emerald zone) */
+                                      /* Loss Zone (Bar expands leftwards from the center / red zone) */
                                       <div 
-                                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-300 shadow-[0_0_10px_#10b981]"
-                                        style={{ width: `${Math.min(decayPct, 100)}%` }}
+                                        className="absolute right-1/2 h-full bg-gradient-to-l from-rose-500 to-rose-700/60 rounded-l-full transition-all duration-300 shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                                        style={{ width: `${Math.min(Math.abs(decayPct) / 2, 50)}%` }}
+                                      ></div>
+                                    ) : (
+                                      /* Profit Zone (Bar expands rightwards from the center / emerald zone) */
+                                      <div 
+                                        className="absolute left-1/2 h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-r-full transition-all duration-300 shadow-[0_0_10px_#10b981]"
+                                        style={{ width: `${Math.min(decayPct / 2, 50)}%` }}
                                       ></div>
                                     )}
-                                    {/* Middle Indicator */}
-                                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></div>
+                                    {/* Middle Entry Level Indicator line */}
+                                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-cyan-400 shadow-[0_0_8px_#22d3ee] z-20"></div>
                                   </div>
                                 </div>
 
