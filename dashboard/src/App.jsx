@@ -1147,10 +1147,6 @@ export default function App() {
 
       </main>
 
-      {/* SYSTEM FOOTER BRAND */}
-      <footer className="py-6 border-t border-white/5 bg-[#05070c]/60 text-center text-[9px] text-gray-600 font-bold tracking-widest uppercase mt-8">
-        DeltaTrade Premium Option Execution Terminal • Version 2.1.0 • Running on UTC+5:30
-      </footer>
 
       {/* COLLAPSIBLE LOGS DRAWER CONSOLE */}
       <div 
