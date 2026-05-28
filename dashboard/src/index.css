@@ -374,15 +374,54 @@ body {
   background-color: rgba(15, 23, 42, 0.05) !important;
 }
 
-/* Modal backgrounds */
+/* Modal and Container backgrounds */
 .light .bg-\[\#0a0e1a\]\/90 {
   background-color: rgba(255, 255, 255, 0.95) !important;
 }
 .light .bg-\[\#0b101d\] {
   background-color: #ffffff !important;
 }
-
+.light .bg-\[\#0b0f19\] {
+  background-color: #ffffff !important; /* Modal wrapper bg is white */
+}
+.light .bg-\[\#0b0f19\]\/80 {
+  background-color: rgba(241, 245, 249, 0.8) !important; /* Helper alert/standby block */
+}
+.light .bg-\[\#0c101d\] {
+  background-color: #ffffff !important; /* Modal base / confirm modal */
+}
 .light .bg-\[\#05070d\]\/60 {
   background-color: rgba(241, 245, 249, 0.6) !important;
+}
+.light .bg-\[\#080b13\]\/80 {
+  background-color: rgba(241, 245, 249, 0.95) !important; /* Strangle pair card boxes */
+}
+.light .bg-black\/15 {
+  background-color: rgba(15, 23, 42, 0.02) !important; /* Strangle set inner container */
+}
+.light .bg-cyan-950\/20 {
+  background-color: rgba(6, 182, 212, 0.06) !important; /* API key box background */
+}
+.light .text-cyan-400\/80 {
+  color: #0891b2 !important; /* API key text cyan color */
+}
+.light .bg-\[\#1c0f16\]\/10 {
+  background-color: rgba(239, 68, 68, 0.04) !important; /* Red alert box */
+}
+
+/* Specific Progress Bar base color for light mode */
+.light .h-2\.5.bg-\[\#05070e\] {
+  background-color: #e2e8f0 !important; /* Slate 200 track */
+}
+
+/* Light Mode Scrollbars */
+.light ::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+}
+.light ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.1) !important;
+}
+.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.4) !important;
 }
 
