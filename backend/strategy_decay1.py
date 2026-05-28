@@ -198,8 +198,10 @@ def execute_decay1_entry(supabase: Client):
                     client_order_id=f"decay1_{leg.lower()}_{int(time.time())}"
                 )
                 
-                # Fetch actual fill price from fill output if available, or fall back to estimated entry premium
-                fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else entry_premium
+                # Fetch actual fill price from average fill output if available, or fall back to estimated entry premium
+                fill_price = safe_float(order.get('avg_fill_price'))
+                if fill_price <= 0.0:
+                    fill_price = entry_premium
                 
                 # Insert position details into Supabase
                 supabase.table('positions').insert({
