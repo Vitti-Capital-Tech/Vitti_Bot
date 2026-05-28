@@ -41,10 +41,10 @@ The web terminal provides three clear work areas:
 
 ---
 
-## 4. Project Directory & Quick File Links
+## 4. Associated Documentation Links
 
-Below are the core documentation resources of the strangle trading desk. You can click on any document to open and view it directly:
+Below are the core documentation resources of the strangle trading desk. You can click on any document to open and view it directly on GitHub:
 
-*   [High-Level Architecture Design (HLD.md)](file:///d:/Work/Projects/meow/docs/HLD.md): Simplified diagrams and block explanations of how the UI, database, and bot daemon interact.
-*   [Low-Level Technical Design (LLD.md)](file:///d:/Work/Projects/meow/docs/LLD.md): Database structures, cryptographic signatures, and state-machine transition charts.
-*   [Proprietary License File (LICENSE)](file:///d:/Work/Projects/meow/LICENSE): The proprietary copyright agreement for Vitti Capital.
+*   [High-Level Architecture Design (HLD.md)](docs/HLD.md): Simplified diagrams and block explanations of how the UI, database, and bot daemon interact.
+*   [Low-Level Technical Design (LLD.md)](docs/LLD.md): Database structures, cryptographic signatures, and state-machine transition charts.
+*   [Proprietary License File (LICENSE)](LICENSE): The proprietary copyright agreement for Vitti Capital.
