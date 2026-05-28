@@ -23,7 +23,9 @@ import {
   Layers,
   Lock,
   TrendingDown,
-  Info
+  Info,
+  Sun,
+  Moon
 } from 'lucide-react'
 
 export default function App() {
@@ -42,6 +44,27 @@ export default function App() {
   const [showAddAccountModal, setShowAddAccountModal] = useState(false)
   const [activeTab, setActiveTab] = useState('positions') // 'positions' | 'accounts' | 'config'
   const [consoleExpanded, setConsoleExpanded] = useState(false)
+  
+  // Theme state: 'dark' | 'light'
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'dark'
+  })
+
+  // Synchronize theme with DOM root class
+  useEffect(() => {
+    if (theme === 'light') {
+      document.documentElement.classList.add('light')
+      document.documentElement.classList.remove('dark')
+    } else {
+      document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
+    }
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+  }
   
   // Add Account form states
   const [accName, setAccName] = useState('')
@@ -456,16 +479,31 @@ export default function App() {
               </button>
             )}
             
-            <button 
-              onClick={() => {
-                setRefreshTrigger(prev => prev + 1)
-                showToast("Manual data sync complete.", 'info')
-              }}
-              className="p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.08] border border-white/5 hover:border-white/10 transition duration-200"
-              title="Sync Data"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : 'text-gray-400'}`} />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Theme Toggle Button */}
+              <button
+                onClick={toggleTheme}
+                className="p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.08] border border-white/5 hover:border-white/10 transition duration-200"
+                title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-indigo-400" />
+                )}
+              </button>
+
+              <button 
+                onClick={() => {
+                  setRefreshTrigger(prev => prev + 1)
+                  showToast("Manual data sync complete.", 'info')
+                }}
+                className="p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.08] border border-white/5 hover:border-white/10 transition duration-200"
+                title="Sync Data"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : 'text-gray-400'}`} />
+              </button>
+            </div>
           </div>
         </div>
       </header>

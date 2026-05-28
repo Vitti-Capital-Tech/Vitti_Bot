@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant light (&:where(.light, .light *));
+
 /* Premium institutional-grade styling variables */
 :root {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -19,6 +21,16 @@ body {
     radial-gradient(at 50% 0%, rgba(6, 182, 212, 0.04) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.03) 0px, transparent 50%);
   background-attachment: fixed;
+  transition: background-color 0.3s, color 0.3s, background-image 0.3s;
+}
+
+.light body {
+  background-color: #f8fafc;
+  color: #1e293b;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.04) 0px, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(6, 182, 212, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.04) 0px, transparent 50%);
 }
 
 /* Premium glassmorphic panels */
@@ -28,6 +40,13 @@ body {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+.light .glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(15, 23, 42, 0.04);
 }
 
 .glass-panel-hover {
@@ -40,6 +59,11 @@ body {
   transform: translateY(-2px);
 }
 
+.light .glass-panel-hover:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  box-shadow: 0 12px 40px 0 rgba(6, 182, 212, 0.12);
+}
+
 /* Subtle glowing cards */
 .glass-card {
   background: rgba(255, 255, 255, 0.02);
@@ -50,9 +74,20 @@ body {
   transition: all 0.3s ease;
 }
 
+.light .glass-card {
+  background: rgba(15, 23, 42, 0.01);
+  border-color: rgba(15, 23, 42, 0.05);
+  box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.01);
+}
+
 .glass-card:hover {
   background: rgba(255, 255, 255, 0.03);
   border-color: rgba(255, 255, 255, 0.07);
+}
+
+.light .glass-card:hover {
+  background: rgba(15, 23, 42, 0.02);
+  border-color: rgba(15, 23, 42, 0.08);
 }
 
 /* Institutional micro-details */
@@ -164,3 +199,190 @@ body {
 .animate-tab-content {
   animation: tab-transition 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ==========================================================================
+   LIGHT MODE SPECIFIC CLASS OVERRIDES
+   ========================================================================== */
+
+/* Text colors */
+.light .text-white,
+.light .dark\:text-white {
+  color: #0f172a !important; /* Slate 900 */
+}
+.light .text-gray-100 {
+  color: #1e293b !important; /* Slate 800 */
+}
+.light .text-gray-200 {
+  color: #334155 !important; /* Slate 700 */
+}
+.light .text-gray-300 {
+  color: #475569 !important; /* Slate 600 */
+}
+.light .text-gray-400 {
+  color: #475569 !important; /* Slate 600 */
+}
+.light .text-gray-500 {
+  color: #64748b !important; /* Slate 500 */
+}
+
+/* Strategic Option Leg Colors */
+.light .text-emerald-400 {
+  color: #059669 !important; /* Emerald 600 */
+}
+.light .text-cyan-400 {
+  color: #0891b2 !important; /* Cyan 600 */
+}
+.light .text-rose-400 {
+  color: #e11d48 !important; /* Rose 600 */
+}
+.light .text-amber-400 {
+  color: #d97706 !important; /* Amber 600 */
+}
+.light .text-indigo-400 {
+  color: #4f46e5 !important; /* Indigo 600 */
+}
+
+/* Background overrides */
+.light .bg-\[\#05070e\] {
+  background-color: #f8fafc !important; /* Slate 50 */
+}
+.light .bg-\[\#0d1222\]\/30 {
+  background-color: rgba(241, 245, 249, 0.7) !important; /* Slate 100/70% */
+}
+.light .bg-\[\#0b0f19\] {
+  background-color: #f1f5f9 !important; /* Slate 100 */
+}
+.light .bg-\[\#070b13\]\/80 {
+  background-color: rgba(241, 245, 249, 0.9) !important;
+}
+.light .bg-white\/\[0\.01\] {
+  background-color: rgba(15, 23, 42, 0.01) !important;
+}
+.light .bg-white\/\[0\.02\] {
+  background-color: rgba(15, 23, 42, 0.02) !important;
+}
+.light .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+.light .bg-cyan-950\/40 {
+  background-color: rgba(6, 182, 212, 0.1) !important;
+}
+.light .bg-\[\#070a13\]\/60 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+}
+.light .bg-\[\#090d16\]\/80 {
+  background-color: rgba(241, 245, 249, 0.8) !important;
+}
+.light .bg-black\/10 {
+  background-color: rgba(15, 23, 42, 0.02) !important;
+}
+.light .bg-cyan-500\/5 {
+  background-color: rgba(6, 182, 212, 0.05) !important;
+}
+.light .bg-emerald-500\/5 {
+  background-color: rgba(16, 185, 129, 0.05) !important;
+}
+.light .bg-rose-500\/5 {
+  background-color: rgba(239, 68, 68, 0.05) !important;
+}
+.light .bg-amber-500\/10 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+.light .bg-cyan-500\/10 {
+  background-color: rgba(6, 182, 212, 0.1) !important;
+}
+.light .bg-indigo-500\/10 {
+  background-color: rgba(99, 102, 241, 0.1) !important;
+}
+.light .bg-emerald-500\/10 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+}
+.light .bg-rose-500\/10 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+.light .bg-emerald-500\/20 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+.light .bg-rose-500\/20 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+.light .bg-cyan-500\/20 {
+  background-color: rgba(6, 182, 212, 0.15) !important;
+}
+
+/* Borders */
+.light .border-white\/5 {
+  border-color: rgba(15, 23, 42, 0.06) !important;
+}
+.light .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+.light .border-white\/\[0\.04\] {
+  border-color: rgba(15, 23, 42, 0.06) !important;
+}
+.light .border-cyan-500\/20 {
+  border-color: rgba(6, 182, 212, 0.3) !important;
+}
+.light .border-indigo-500\/20 {
+  border-color: rgba(99, 102, 241, 0.3) !important;
+}
+.light .border-emerald-500\/20 {
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+.light .border-rose-500\/20 {
+  border-color: rgba(239, 68, 68, 0.3) !important;
+}
+.light .border-amber-500\/20 {
+  border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+/* Inputs and Forms */
+.light input,
+.light select {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+.light input:focus,
+.light select:focus {
+  border-color: #06b6d4 !important;
+}
+.light input:disabled {
+  background-color: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+/* Interactive Toggles & Controls */
+.light .active-pills-bg {
+  background-color: rgba(15, 23, 42, 0.05) !important;
+}
+.light .hover-white-008:hover {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+
+/* Database terminal drawer */
+.light .bg-\[\#070b13\]\/95 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+}
+.light .bg-cyan-950\/40 {
+  background-color: rgba(6, 182, 212, 0.08) !important;
+}
+.light .bg-black\/30 {
+  background-color: rgba(15, 23, 42, 0.03) !important;
+}
+.light .bg-black\/40 {
+  background-color: rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Modal backgrounds */
+.light .bg-\[\#0a0e1a\]\/90 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+.light .bg-\[\#0b101d\] {
+  background-color: #ffffff !important;
+}
+
+.light .bg-\[\#05070d\]\/60 {
+  background-color: rgba(241, 245, 249, 0.6) !important;
+}
+
