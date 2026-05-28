@@ -395,52 +395,52 @@ export default function App() {
       <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[180px] pointer-events-none"></div>
       <div className="absolute bottom-10 left-10 w-96 h-96 bg-emerald-500/[0.02] rounded-full blur-3xl pointer-events-none"></div>
       
-      {/* TOP SYSTEM STATUS BAR */}
-      <div className="bg-[#0b0f19]/80 border-b border-white/[0.04] backdrop-blur-md px-6 py-2.5 text-xs text-gray-400 font-medium">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-2">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${isDaemonHealthy() ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'} shadow-[0_0_8px_#10b981]`}></span>
-              <span className="text-[10px] font-bold tracking-wider uppercase text-gray-300">
-                Execution Daemon: {isDaemonHealthy() ? 'ONLINE' : 'STANDBY (NO RECENT HEARTBEATS)'}
-              </span>
-            </span>
-            <span className="text-gray-600 hidden sm:inline">|</span>
-            <span className="flex items-center gap-1.5 text-gray-500 font-mono text-[10px]">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              IST TIMEZONE: (GMT+5:30)
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[9px] bg-cyan-950/40 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-bold uppercase tracking-wider">
-              V2 Intraday Signed Client
-            </span>
-            <span className="text-[9px] bg-[#111827] text-gray-400 border border-white/5 px-2 py-0.5 rounded font-mono">
-              Demo Testnet Enabled
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* MAIN HEADER NAVBAR */}
       <header className="border-b border-white/5 bg-[#070a13]/60 sticky top-0 z-40 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 py-4.5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/10 to-indigo-500/10 border border-cyan-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-float">
-              <Shield className="w-6 h-6 text-cyan-400 drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-cyan-400">
-                  DeltaTrade
-                </h1>
-                <span className="text-[8px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.2 rounded font-bold tracking-widest uppercase">PRO</span>
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
+            <div className="flex items-center gap-4">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/10 to-indigo-500/10 border border-cyan-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-float">
+                <Shield className="w-6 h-6 text-cyan-400 drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]" />
               </div>
-              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Automated Intraday Option Strangle Desk</p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-cyan-400">
+                    DeltaTrade
+                  </h1>
+                  <span className="text-[8px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.2 rounded font-bold tracking-widest uppercase">PRO</span>
+                </div>
+                <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Automated Intraday Option Strangle Desk</p>
+              </div>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          {/* Navigation Tabs aligned beside the logo/branding */}
+          <div className="flex items-center gap-1 bg-[#090d16]/80 border border-white/[0.04] p-1 rounded-xl w-full md:w-auto overflow-x-auto scrollbar-none">
+            {[
+              { id: 'positions', label: 'Active Strangles', icon: Activity },
+              { id: 'accounts', label: 'Trading Accounts', icon: UserPlus },
+              { id: 'config', label: 'Decay1 Parameters', icon: Sliders }
+            ].map(tab => {
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center justify-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 whitespace-nowrap focus:outline-none focus:ring-0 ${
+                    isActive 
+                    ? 'bg-white/[0.06] text-white border border-white/5 shadow-sm' 
+                    : 'text-gray-400 hover:text-gray-200 border border-transparent'
+                  }`}
+                >
+                  <tab.icon className={`w-3.5 h-3.5 transition-colors duration-200 ${isActive ? 'text-cyan-400' : 'text-gray-400'}`} />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+          
+          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
             {/* Global Strategy Status Toggler */}
             {strategy && (
               <button 
@@ -545,45 +545,14 @@ export default function App() {
           </div>
         </div>
 
-        {/* MAIN CONSOLE PANEL */}
-        <div className="glass-panel rounded-2xl bg-[#090d18]/45 backdrop-blur-2xl border border-white/5 overflow-hidden flex flex-col min-h-[500px] shadow-2xl">
-          
-          {/* Sleek Horizontal Tab List */}
-          <div className="flex border-b border-white/[0.04] bg-[#070b13]/80 px-4 pt-3.5 gap-1.5">
-            {[
-              { id: 'positions', label: 'Active Strangles', icon: Activity },
-              { id: 'accounts', label: 'Trading Accounts', icon: UserPlus },
-              { id: 'config', label: 'Decay1 Parameters', icon: Sliders }
-            ].map(tab => {
-              const isActive = activeTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2.5 px-6 py-4 text-xs font-bold uppercase tracking-wider rounded-t-xl transition-all duration-300 relative focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ${
-                    isActive 
-                    ? 'bg-[#0b101c]/70 text-white border-t border-x border-white/5 shadow-inner' 
-                    : 'text-gray-500 hover:text-gray-300'
-                  }`}
-                >
-                  <tab.icon className={`w-4 h-4 transition-colors duration-300 ${isActive ? 'text-cyan-400' : 'text-gray-500'}`} />
-                  {tab.label}
-                  <span className={`absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full shadow-[0_0_12px_#06b6d4] transition-all duration-300 transform origin-center ${
-                    isActive ? 'opacity-100 scale-x-100' : 'opacity-0 scale-x-50'
-                  }`}></span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* TAB SHEETS */}
-          <div className="p-8 flex-1 bg-white/[0.01] relative min-h-[500px]">
+        {/* MAIN CONSOLE PANEL - Clean, borderless container */}
+        <div className="relative min-h-[500px] w-full flex-1">
             
             {/* POSITIONS & STRANGLE WORKSPACE */}
             <div className={`transition-all duration-350 ease-in-out transform flex flex-col gap-8 ${
               activeTab === 'positions' 
               ? 'visible opacity-100 translate-y-0 scale-100 pointer-events-auto relative z-10' 
-              : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-8 top-8 z-0'
+              : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-0 top-0 z-0'
             }`}>
                 {positions.length === 0 ? (
                   /* INSTITUTIONAL STANDBY WORKSPACE */
@@ -930,7 +899,7 @@ export default function App() {
             <div className={`transition-all duration-350 ease-in-out transform flex flex-col gap-6 ${
               activeTab === 'accounts' 
               ? 'visible opacity-100 translate-y-0 scale-100 pointer-events-auto relative z-10' 
-              : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-8 top-8 z-0'
+              : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-0 top-0 z-0'
             }`}>
                 
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-white/[0.04] pb-4.5 gap-3">
@@ -1031,7 +1000,7 @@ export default function App() {
                 className={`transition-all duration-350 ease-in-out transform flex flex-col gap-6 max-w-2xl bg-black/10 p-6 rounded-2xl border border-white/5 ${
                   activeTab === 'config' 
                   ? 'visible opacity-100 translate-y-0 scale-100 pointer-events-auto relative z-10' 
-                  : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-8 top-8 z-0'
+                  : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-0 top-0 z-0'
                 }`}
               >
                 
@@ -1142,7 +1111,6 @@ export default function App() {
               </form>
             )}
 
-          </div>
         </div>
 
       </main>
