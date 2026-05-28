@@ -221,7 +221,51 @@ def execute_decay1_entry(supabase: Client):
                 log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss placed at {sl_price}. Spot Target: {tp_spot}", 'TRADE')
                 
             except Exception as e:
-                log_trade_event(supabase, name, f"Failed to place {leg} Short {symbol}: {e}", 'ERROR')
+                err_str = str(e)
+                if "market_disrupted_post_only_mode" in err_str:
+                    log_trade_event(supabase, name, f"Post-Only mode detected for {symbol}. Retrying with Limit Order at best ask...", 'INFO')
+                    try:
+                        # Fallback price: use best_ask for sell limit order (maker)
+                        best_ask = safe_float(contract.get('best_ask'), entry_premium)
+                        if best_ask <= 0.0:
+                            best_ask = entry_premium
+                            
+                        # Place limit order with bracket stop loss attached
+                        order = client.place_order(
+                            product_id=prod_id,
+                            size=size,
+                            side='sell',
+                            order_type='limit_order',
+                            limit_price=str(best_ask),
+                            sl_price=str(sl_price),
+                            client_order_id=f"decay1_{leg.lower()}_lim_{int(time.time())}"
+                        )
+                        
+                        # Fetch actual fill price or use limit best_ask
+                        fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
+                        
+                        # Insert position details into Supabase
+                        supabase.table('positions').insert({
+                            'account_id': acc['id'],
+                            'strategy_name': 'decay1',
+                            'symbol': symbol,
+                            'side': 'sell',
+                            'product_id': prod_id,
+                            'size': size,
+                            'entry_price': fill_price,
+                            'mark_price': fill_price,
+                            'sl_price': sl_price,
+                            'tp_price': tp_spot,
+                            'pnl': 0.00,
+                            'status': 'open',
+                            'entry_order_id': order.get('id')
+                        }).execute()
+                        
+                        log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss placed at {sl_price}. Spot Target: {tp_spot}", 'TRADE')
+                    except Exception as limit_err:
+                        log_trade_event(supabase, name, f"Limit order fallback also failed for {symbol}: {limit_err}", 'ERROR')
+                else:
+                    log_trade_event(supabase, name, f"Failed to place {leg} Short {symbol}: {e}", 'ERROR')
 
 def execute_decay1_exit(supabase: Client):
     """
