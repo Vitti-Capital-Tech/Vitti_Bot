@@ -431,7 +431,7 @@ export default function App() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-white font-['Space_Grotesk'] bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-cyan-400">
+                <h1 className="text-2xl font-bold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-cyan-400">
                   DeltaTrade
                 </h1>
                 <span className="text-[8px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.2 rounded font-bold tracking-widest uppercase">PRO</span>
@@ -594,7 +594,7 @@ export default function App() {
                       <div className="w-16 h-16 rounded-full bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.05)] mb-4 animate-pulse">
                         <CheckCircle2 className="w-8 h-8" />
                       </div>
-                      <h4 className="text-xl font-bold text-white font-['Space_Grotesk'] tracking-wide">Strangle Execution Idle</h4>
+                      <h4 className="text-xl font-bold text-white tracking-wide">Strangle Execution Idle</h4>
                       <p className="text-xs text-gray-500 mt-2.5 max-w-md leading-relaxed">
                         There are no active options strangle positions currently open on Delta Exchange. The scheduling daemon is actively awaiting the intraday strategy triggers.
                       </p>
@@ -677,7 +677,7 @@ export default function App() {
                                 STRANGLE SET
                               </div>
                               <div>
-                                <h4 className="font-bold text-white font-['Space_Grotesk'] text-lg tracking-tight">{group.accountName}</h4>
+                                <h4 className="font-bold text-white text-lg tracking-tight">{group.accountName}</h4>
                                 <span className={`text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md mt-1 inline-block ${
                                   group.env === 'production' 
                                   ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
@@ -935,7 +935,7 @@ export default function App() {
                 
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-white/[0.04] pb-4.5 gap-3">
                   <div>
-                    <h3 className="text-base font-bold text-white font-['Space_Grotesk'] tracking-wide">Linked API Credentials</h3>
+                                    <h3 className="text-base font-bold text-white tracking-wide">Linked API Credentials</h3>
                     <p className="text-xs text-gray-500">Secure execution layers connecting to Delta Exchange API portal.</p>
                   </div>
                   
@@ -973,7 +973,7 @@ export default function App() {
 
                           <div className="flex justify-between items-start">
                             <div>
-                              <h4 className="font-extrabold text-white text-lg tracking-tight font-['Space_Grotesk']">{acc.name}</h4>
+                              <h4 className="font-extrabold text-white text-lg tracking-tight">{acc.name}</h4>
                               <div className="flex gap-1.5 mt-2.5">
                                 <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest border ${
                                   acc.env === 'production' 
@@ -1037,7 +1037,7 @@ export default function App() {
                 
                 <div className="border-b border-white/[0.04] pb-4 flex items-center justify-between">
                   <div>
-                    <h3 className="text-base font-bold text-white font-['Space_Grotesk'] tracking-wide">Decay1 Option Parameters</h3>
+                    <h3 className="text-base font-bold text-white tracking-wide">Decay1 Option Parameters</h3>
                     <p className="text-xs text-gray-500">Fine-tune decay boundaries and underlying asset guard rails.</p>
                   </div>
                   <span className="text-[10px] bg-[#0c101d] text-cyan-400 font-mono border border-cyan-500/20 px-2.5 py-1 rounded-md font-bold uppercase tracking-wider">
@@ -1216,7 +1216,7 @@ export default function App() {
           <div className="bg-[#0b0f19] border border-white/10 rounded-2xl p-6 w-full max-w-md flex flex-col gap-4 shadow-2xl backdrop-blur-xl animate-fade-in relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-cyan-400 to-indigo-500"></div>
             
-            <h3 className="text-lg font-bold text-white font-['Space_Grotesk'] tracking-wide">Link Delta India Client API</h3>
+            <h3 className="text-lg font-bold text-white tracking-wide">Link Delta India Client API</h3>
             <p className="text-[11px] text-gray-500 -mt-1.5">Credentials are authenticated via standard HMAC-SHA256 protocol on-device.</p>
             
             <form onSubmit={handleAddAccount} className="flex flex-col gap-4.5 mt-2">
@@ -1299,7 +1299,7 @@ export default function App() {
             </div>
             
             <div>
-              <h3 className="text-lg font-bold text-white tracking-wide font-['Space_Grotesk']">{showConfirmModal.title}</h3>
+              <h3 className="text-lg font-bold text-white tracking-wide">{showConfirmModal.title}</h3>
               <p className="text-xs text-gray-400 mt-3 leading-relaxed">
                 {showConfirmModal.message}
               </p>
