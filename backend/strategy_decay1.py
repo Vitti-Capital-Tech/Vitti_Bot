@@ -173,6 +173,14 @@ def execute_decay1_entry(supabase: Client):
         except Exception as cancel_err:
             print(f"Notice: Failed to clear all orders on exchange for {name}: {cancel_err}")
             
+        # Fetch current active positions from Delta Exchange to reconcile and close any existing open position
+        # on the target option products before placing the new ones.
+        exchange_positions = []
+        try:
+            exchange_positions = client.get_positions(underlying_asset_symbol=underlying)
+        except Exception as e:
+            print(f"Notice: Failed to fetch active positions for pre-entry cleanup: {e}")
+            
         # Sizing logic: for this simple deployment, we sell 1 contract (can be made configurable)
         size = 1 
         
@@ -180,6 +188,34 @@ def execute_decay1_entry(supabase: Client):
         for leg, contract in [('Call', call_contract), ('Put', put_contract)]:
             symbol = contract['symbol']
             prod_id = contract['product_id']
+            
+            # Reconcile and close any existing active position for this contract on the exchange first
+            if exchange_positions:
+                for ex_pos in exchange_positions:
+                    ex_symbol = ex_pos.get('symbol') or ex_pos.get('product_symbol') or (ex_pos.get('product') and ex_pos['product'].get('symbol'))
+                    ex_size = int(ex_pos.get('size', 0))
+                    if ex_symbol == symbol and abs(ex_size) > 0:
+                        log_trade_event(supabase, name, f"Found existing active position for {symbol} on exchange (Size: {ex_size}). Squaring off to clear brackets...", 'INFO')
+                        try:
+                            # Buy to close if short, sell to close if long
+                            close_side = 'buy' if ex_size < 0 else 'sell'
+                            client.place_order(
+                                product_id=prod_id,
+                                size=abs(ex_size),
+                                side=close_side,
+                                order_type='market_order'
+                            )
+                            log_trade_event(supabase, name, f"Successfully squared off existing position for {symbol}.", 'INFO')
+                            # Wait a moment for matching engine processing
+                            time.sleep(1.5)
+                            
+                            # Re-run cancel all to clear the newly created closing order's brackets if any
+                            try:
+                                client.cancel_all_orders()
+                            except Exception:
+                                pass
+                        except Exception as close_err:
+                            log_trade_event(supabase, name, f"Failed to square off existing position for {symbol}: {close_err}", 'ERROR')
             # Fetch current premium for the leg
             entry_premium = contract['mark_price'] if contract['mark_price'] > 0 else (contract['best_ask'] or 50.0)
             
@@ -374,7 +410,7 @@ def monitor_positions_loop(supabase: Client):
                 active_symbols = set()
                 if exchange_positions is not None:
                     for ex_pos in exchange_positions:
-                        ex_symbol = ex_pos.get('symbol') or (ex_pos.get('product') and ex_pos['product'].get('symbol'))
+                        ex_symbol = ex_pos.get('symbol') or ex_pos.get('product_symbol') or (ex_pos.get('product') and ex_pos['product'].get('symbol'))
                         ex_size = abs(int(ex_pos.get('size', 0)))
                         if ex_symbol and ex_size > 0:
                             active_symbols.add(ex_symbol)
