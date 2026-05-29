@@ -9,6 +9,8 @@ import config
 from strategy_decay1 import (
     execute_decay1_entry,
     execute_decay1_exit,
+    execute_decay2_entry,
+    execute_decay2_exit,
     monitor_positions_loop,
     log_trade_event
 )
@@ -69,6 +71,31 @@ def main():
         name='decay1_exit'
     )
     print("Scheduled Decay1 exit job: Monday-Friday at 12:29 IST.")
+
+    # Schedule Decay2 Entry: Monday to Friday at 01:31 PM IST (13:31)
+    scheduler.add_job(
+        func=execute_decay2_entry,
+        trigger='cron',
+        day_of_week='mon-fri',
+        hour=13,
+        minute=31,
+        args=[supabase],
+        name='decay2_entry'
+    )
+    print("Scheduled Decay2 entry job: Monday-Friday at 13:31 IST.")
+    
+    # Schedule Decay2 Exit: Monday to Friday at 05:29 PM IST (17:29)
+    scheduler.add_job(
+        func=execute_decay2_exit,
+        trigger='cron',
+        day_of_week='mon-fri',
+        hour=17,
+        minute=29,
+        args=[supabase],
+        name='decay2_exit'
+    )
+    print("Scheduled Decay2 exit job: Monday-Friday at 17:29 IST.")
+
 
     # 4. Launch Scheduler
     log_trade_event(supabase, 'SYSTEM', 'All execution schedules configured. Scheduler starting...', 'INFO')

@@ -338,19 +338,21 @@ export default function App() {
   // Calculate live unrealized PnL summary
   const totalPnL = positions.reduce((acc, pos) => acc + (parseFloat(pos.pnl) || 0.0), 0.0)
 
-  // Group positions by Account ID to render consolidated Strangles
+  // Group positions by Account ID + Strategy Name to render consolidated Strangles
   const getGroupedStrangles = () => {
     const groups = {}
     positions.forEach(pos => {
-      if (!groups[pos.account_id]) {
-        groups[pos.account_id] = []
+      const key = `${pos.account_id}_${pos.strategy_name}`
+      if (!groups[key]) {
+        groups[key] = []
       }
-      groups[pos.account_id].push(pos)
+      groups[key].push(pos)
     })
 
-    return Object.keys(groups).map(accId => {
+    return Object.keys(groups).map(groupKey => {
+      const [accId, strategyName] = groupKey.split('_')
       const accDetails = accounts.find(a => a.id === accId) || { name: 'Linked Account', env: 'production' }
-      const accPosList = groups[accId]
+      const accPosList = groups[groupKey]
       
       // Separate into Call and Put legs
       const calls = accPosList.filter(p => p.symbol.startsWith('C-'))
@@ -391,6 +393,7 @@ export default function App() {
         accountId: accId,
         accountName: accDetails.name,
         env: accDetails.env,
+        strategyName,
         stranglePairs,
         unpaired
       }
@@ -675,13 +678,13 @@ export default function App() {
                       if (!hasActiveStrangle) return null
 
                       return (
-                        <div key={group.accountId} className="glass-card rounded-2xl border border-white/5 bg-[#0d1222]/30 p-6 flex flex-col gap-6 shadow-xl relative overflow-hidden">
+                        <div key={`${group.accountId}_${group.strategyName}`} className="glass-card rounded-2xl border border-white/5 bg-[#0d1222]/30 p-6 flex flex-col gap-6 shadow-xl relative overflow-hidden">
                           
                           {/* Top Header Row of Account workspace */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-4 gap-3">
                             <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold">
-                                STRANGLE SET
+                              <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold uppercase tracking-wider">
+                                STRANGLE SET - {group.strategyName || 'DECAY1'}
                               </div>
                               <div>
                                 <h4 className="font-bold text-white text-lg tracking-tight">{group.accountName}</h4>
@@ -791,35 +794,42 @@ export default function App() {
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-3 mt-3.5 text-[10px] font-mono text-gray-500 font-bold uppercase">
-                                          <div>
-                                            <p className="font-sans">Option Strike</p>
-                                            <p className="text-white text-xs mt-1">${legParsed.strike.toLocaleString()}</p>
-                                          </div>
-                                          <div>
-                                            <p className="font-sans">Leg Contract Size</p>
-                                            <p className="text-gray-300 text-xs mt-1">{leg.size} Cont</p>
-                                          </div>
-                                          <div>
-                                            <p className="font-sans">Stop Loss Boundary</p>
-                                            <p className="text-rose-400 text-xs mt-1">${parseFloat(leg.sl_price || 0).toFixed(2)}</p>
-                                          </div>
-                                          <div>
-                                            <p className="font-sans">Entry Price</p>
-                                            <p className="text-gray-400 text-xs mt-1">${parseFloat(leg.entry_price).toFixed(2)}</p>
-                                          </div>
-                                          <div>
-                                            <p className="font-sans">Mark Price</p>
-                                            <p className="text-cyan-400 text-xs mt-1">${parseFloat(leg.mark_price || 0).toFixed(2)}</p>
-                                          </div>
-                                          <div className="flex items-end justify-end">
-                                            <button
-                                              onClick={() => triggerLegClose(leg.id, leg.symbol)}
-                                              className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/25 transition-all text-[8px] font-bold uppercase tracking-wider"
-                                            >
-                                              Exit Leg
-                                            </button>
-                                          </div>
-                                        </div>
+                                           <div>
+                                             <p className="font-sans">Option Strike</p>
+                                             <p className="text-white text-xs mt-1">${legParsed.strike.toLocaleString()}</p>
+                                           </div>
+                                           <div>
+                                             <p className="font-sans">Leg Contract Size</p>
+                                             <p className="text-gray-300 text-xs mt-1">{leg.size} Cont</p>
+                                           </div>
+                                           <div>
+                                             <p className="font-sans">Stop Loss Boundary</p>
+                                             <p className="text-rose-400 text-xs mt-1">${parseFloat(leg.sl_price || 0).toFixed(2)}</p>
+                                           </div>
+                                           <div>
+                                             <p className="font-sans">Entry Price</p>
+                                             <p className="text-gray-400 text-xs mt-1">${parseFloat(leg.entry_price).toFixed(2)}</p>
+                                           </div>
+                                           <div>
+                                             <p className="font-sans">Mark Price</p>
+                                             <p className="text-cyan-400 text-xs mt-1">${parseFloat(leg.mark_price || 0).toFixed(2)}</p>
+                                           </div>
+                                           <div>
+                                             <p className="font-sans">{leg.strategy_name === 'decay2' ? 'Take Profit' : 'Spot Target'}</p>
+                                             <p className="text-emerald-400 text-xs mt-1">
+                                               {leg.strategy_name === 'decay2' ? `$${parseFloat(leg.tp_price || 0).toFixed(2)}` : `$${parseFloat(leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                                             </p>
+                                           </div>
+                                         </div>
+
+                                         <div className="flex justify-end mt-4 border-t border-white/5 pt-3">
+                                           <button
+                                             onClick={() => triggerLegClose(leg.id, leg.symbol)}
+                                             className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/25 transition-all text-[8px] font-bold uppercase tracking-wider"
+                                           >
+                                             Exit Leg
+                                           </button>
+                                         </div>
 
                                       </div>
                                     )
