@@ -441,15 +441,15 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
             <div className="flex items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/10 to-indigo-500/10 border border-cyan-500/20 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-float">
-                <Shield className="w-6 h-6 text-cyan-400 drop-shadow-[0_0_6px_rgba(6,182,212,0.5)]" />
+              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-sm">
+                <Shield className="w-5 h-5 text-slate-300" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-gray-200 to-cyan-400">
+                  <h1 className="text-xl font-extrabold tracking-tight text-white">
                     DeltaTrade
                   </h1>
-                  <span className="text-[8px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.2 rounded font-bold tracking-widest uppercase">PRO</span>
+                  <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.2 rounded font-bold tracking-widest uppercase">PRO</span>
                 </div>
                 <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Automated Intraday Option Strangle Desk</p>
               </div>
@@ -520,7 +520,7 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           
           {/* Performance Box */}
-          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border-t-2 border-cyan-500/60 hover:-translate-y-0.5 transition-all duration-300 glow-cyan-subtle">
+          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border border-white/[0.04] bg-[#0c101d] hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 shadow-sm">
             <div className="absolute right-3 bottom-3 opacity-[0.03] pointer-events-none">
               <DollarSign className="w-28 h-28 text-white" />
             </div>
@@ -548,7 +548,7 @@ export default function App() {
           </div>
           
           {/* Active Workspaces Box */}
-          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border-t-2 border-indigo-500/60 hover:-translate-y-0.5 transition-all duration-300">
+          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border border-white/[0.04] bg-[#0c101d] hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 shadow-sm">
             <div className="absolute right-3 bottom-3 opacity-[0.03] pointer-events-none">
               <Layers className="w-28 h-28 text-white" />
             </div>
@@ -568,7 +568,7 @@ export default function App() {
           </div>
 
           {/* Strategy Details Box */}
-          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border-t-2 border-amber-500/60 hover:-translate-y-0.5 transition-all duration-300">
+          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border border-white/[0.04] bg-[#0c101d] hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 shadow-sm">
             <div className="absolute right-3 bottom-3 opacity-[0.03] pointer-events-none">
               <Sliders className="w-28 h-28 text-white" />
             </div>
@@ -953,9 +953,9 @@ export default function App() {
                   
                   <button 
                     onClick={() => setShowAddAccountModal(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 text-black text-xs font-bold uppercase tracking-wider transition-all duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold tracking-wider transition-all duration-300 shadow-[0_4px_12px_rgba(79,70,229,0.15)] focus:outline-none focus:ring-0"
                   >
-                    <UserPlus className="w-4.5 h-4.5" />
+                    <UserPlus className="w-4 h-4" />
                     Link New Account
                   </button>
                 </div>
@@ -1199,7 +1199,7 @@ export default function App() {
 
                     <button 
                       type="submit"
-                      className="w-full py-3.5 mt-2 rounded-xl bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 text-black font-extrabold uppercase tracking-wider text-xs transition duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                      className="w-full py-3 mt-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold tracking-wider text-xs transition duration-300 shadow-[0_4px_12px_rgba(79,70,229,0.15)] focus:outline-none focus:ring-0"
                     >
                       Save {strat.name.toUpperCase()} Configuration
                     </button>
@@ -1286,54 +1286,54 @@ export default function App() {
       {showAddAccountModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0b0f19] border border-white/10 rounded-2xl p-6 w-full max-w-md flex flex-col gap-4 shadow-2xl backdrop-blur-xl animate-fade-in relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-cyan-400 to-indigo-500"></div>
+            <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-600"></div>
             
             <h3 className="text-lg font-bold text-white tracking-wide">Link Delta India Client API</h3>
             <p className="text-[11px] text-gray-500 -mt-1.5">Credentials are authenticated via standard HMAC-SHA256 protocol on-device.</p>
             
             <form onSubmit={handleAddAccount} className="flex flex-col gap-4.5 mt-2">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-mono">Account Tag Label</label>
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-sans">Account Tag Label</label>
                 <input 
                   type="text" 
                   value={accName} 
                   onChange={e => setAccName(e.target.value)}
                   placeholder="e.g. Primary Strangle Account" 
                   required
-                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-bold"
+                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-mono">Delta API Key</label>
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-sans">Delta API Key</label>
                 <input 
                   type="text" 
                   value={accKey} 
                   onChange={e => setAccKey(e.target.value)}
                   placeholder="Paste public API key" 
                   required
-                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono"
+                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-mono">Delta API Secret</label>
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-sans">Delta API Secret</label>
                 <input 
                   type="password" 
                   value={accSecret} 
                   onChange={e => setAccSecret(e.target.value)}
                   placeholder="Paste private API secret key" 
                   required
-                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono"
+                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans"
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-mono">Environment Type</label>
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-sans">Environment Type</label>
                 <select 
                   value={accEnv} 
                   onChange={e => setAccEnv(e.target.value)}
-                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-bold"
+                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                 >
                   <option value="testnet">Testnet Sandbox (Demo Accounts)</option>
                   <option value="production">Production Live Desk (Real Money)</option>
@@ -1344,13 +1344,13 @@ export default function App() {
                 <button 
                   type="button" 
                   onClick={() => setShowAddAccountModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider transition font-mono"
+                  className="px-4 py-2 text-xs font-semibold text-gray-400 hover:text-white uppercase tracking-wider transition font-sans focus:outline-none focus:ring-0"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
-                  className="px-6 py-2 bg-gradient-to-r from-cyan-400 to-indigo-500 text-black text-xs font-bold uppercase tracking-wider rounded-xl transition duration-300 shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold uppercase tracking-wider rounded-xl transition duration-300 shadow-[0_4px_12px_rgba(79,70,229,0.15)] focus:outline-none focus:ring-0"
                 >
                   Confirm Link
                 </button>
@@ -1364,18 +1364,18 @@ export default function App() {
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-[#0c101d] border border-white/10 rounded-2xl p-6 w-full max-w-md flex flex-col gap-4 text-center shadow-2xl relative overflow-hidden animate-fade-in">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-rose-500 shadow-[0_0_10px_#ef4444]"></div>
+            <div className="absolute top-0 left-0 right-0 h-1 bg-rose-600"></div>
             
-            <div className="mx-auto w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shadow-[0_0_15px_rgba(239,68,68,0.1)] animate-pulse">
-              <AlertTriangle className="w-6 h-6 animate-bounce" />
+            <div className="mx-auto w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+              <AlertTriangle className="w-6 h-6" />
             </div>
             
             <div>
               <h3 className="text-lg font-bold text-white tracking-wide">{showConfirmModal.title}</h3>
-              <p className="text-xs text-gray-400 mt-3 leading-relaxed">
+              <p className="text-xs text-gray-400 mt-3 leading-relaxed font-sans">
                 {showConfirmModal.message}
               </p>
-              <div className="mt-4 bg-rose-950/20 p-3 rounded-xl border border-rose-500/15 text-[10px] text-rose-400 font-bold uppercase tracking-wider">
+              <div className="mt-4 bg-rose-950/20 p-3 rounded-xl border border-rose-500/15 text-[10px] text-rose-400 font-bold uppercase tracking-wider font-sans">
                 WARNING: Slippage may occur during high-volatility events.
               </div>
             </div>
@@ -1383,13 +1383,13 @@ export default function App() {
             <div className="flex gap-3 justify-center mt-3.5">
               <button 
                 onClick={() => setShowConfirmModal(null)}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-gray-400 hover:text-white uppercase tracking-wider transition font-mono"
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-400 hover:text-white uppercase tracking-wider transition font-sans focus:outline-none focus:ring-0"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleEmergencyClose}
-                className="px-6 py-2.5 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition duration-300 shadow-lg shadow-rose-950/40"
+                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold uppercase tracking-wider rounded-xl transition duration-300 shadow-[0_4px_12px_rgba(239,68,68,0.15)] focus:outline-none focus:ring-0"
               >
                 Confirm market square off
               </button>
