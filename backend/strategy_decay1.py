@@ -188,6 +188,12 @@ def execute_decay1_entry(supabase: Client):
                 tp_spot = round(spot * (1 + tgt_pct), 2)
                 
             try:
+                # Pre-emptively clear any stale resting orders/brackets on this product first to avoid bracket_order_position_exists error
+                try:
+                    client.cancel_order(product_id=prod_id)
+                except Exception:
+                    pass
+                    
                 # Place Sell Order at market with bracket SL attached
                 order = client.place_order(
                     product_id=prod_id,
