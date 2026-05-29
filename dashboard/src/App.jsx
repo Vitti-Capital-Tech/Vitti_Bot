@@ -604,7 +604,7 @@ export default function App() {
         </div>
 
         {/* MAIN CONSOLE PANEL - Clean, borderless container */}
-        <div className="relative min-h-[500px] w-full flex-1">
+        <div className="relative min-h-[500px] w-full flex-1 border-t border-white/[0.04] pt-8">
             
             {/* POSITIONS & STRANGLE WORKSPACE */}
             <div className={`transition-all duration-350 ease-in-out transform flex flex-col gap-8 ${
