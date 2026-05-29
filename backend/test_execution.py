@@ -1,7 +1,8 @@
 import sys
 from supabase import create_client, Client
 import config
-from strategy_decay1 import execute_decay1_entry, execute_decay2_entry
+from strategy_decay1 import execute_decay1_entry
+from strategy_decay2 import execute_decay2_entry
 
 def test_run():
     strategy_name = 'decay1'

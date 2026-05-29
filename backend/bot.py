@@ -9,10 +9,13 @@ import config
 from strategy_decay1 import (
     execute_decay1_entry,
     execute_decay1_exit,
-    execute_decay2_entry,
-    execute_decay2_exit,
     monitor_positions_loop,
     log_trade_event
+)
+from strategy_decay2 import (
+    execute_decay2_entry,
+    execute_decay2_exit,
+    monitor_positions_loop_decay2
 )
 
 def main():
@@ -35,14 +38,23 @@ def main():
     # Log starting up event
     log_trade_event(supabase, 'SYSTEM', 'Trading Bot daemon starting up...', 'INFO')
 
-    # 2. Start Background Position Monitor Thread
+    # 2. Start Background Position Monitor Threads (Decay1 and Decay2)
     # Monitors target spot prices (0.75% move) and updates mark prices/PnL
-    monitor_thread = threading.Thread(
+    monitor_thread_d1 = threading.Thread(
         target=monitor_positions_loop,
         args=(supabase,),
         daemon=True
     )
-    monitor_thread.start()
+    monitor_thread_d1.start()
+    print("Started Decay1 position monitor thread.")
+
+    monitor_thread_d2 = threading.Thread(
+        target=monitor_positions_loop_decay2,
+        args=(supabase,),
+        daemon=True
+    )
+    monitor_thread_d2.start()
+    print("Started Decay2 position monitor thread.")
 
     # 3. Configure APScheduler with India Standard Time
     tz = timezone(config.TIMEZONE)
