@@ -525,7 +525,7 @@ export default function App() {
               <DollarSign className="w-28 h-28 text-white" />
             </div>
             <div className="flex justify-between items-start">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">Unrealized Performance</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Unrealized Performance</p>
               <span className={`text-[9px] px-2 py-0.5 rounded-md font-extrabold tracking-wider border ${
                 totalPnL >= 0 
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
@@ -534,7 +534,7 @@ export default function App() {
                 {totalPnL >= 0 ? 'PROFIT' : 'DRAWDOWN'}
               </span>
             </div>
-            <h3 className={`text-3xl font-extrabold mt-3 tracking-tight font-mono ${
+            <h3 className={`text-3xl font-extrabold mt-3 tracking-tight font-sans ${
               totalPnL >= 0 
               ? 'text-emerald-400 drop-shadow-[0_0_12px_rgba(16,185,129,0.2)]' 
               : 'text-rose-400 drop-shadow-[0_0_12px_rgba(239,68,68,0.2)]'
@@ -553,12 +553,12 @@ export default function App() {
               <Layers className="w-28 h-28 text-white" />
             </div>
             <div className="flex justify-between items-start">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">Live Strangle Pairs</p>
-              <span className="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md font-bold tracking-wider font-mono">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Live Strangle Pairs</p>
+              <span className="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md font-bold tracking-wider font-sans">
                 {activeStrangleAccountsCount} ACCOUNTS
               </span>
             </div>
-            <h3 className="text-3xl font-extrabold mt-3 text-white tracking-tight font-mono">
+            <h3 className="text-3xl font-extrabold mt-3 text-white tracking-tight font-sans">
               {positions.length} <span className="text-sm font-semibold text-gray-400">Option Legs</span>
             </h3>
             <div className="mt-4 flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
@@ -573,8 +573,8 @@ export default function App() {
               <Sliders className="w-28 h-28 text-white" />
             </div>
             <div className="flex justify-between items-start">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-mono">Configure Strategies</p>
-              <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-bold tracking-wider font-mono">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Configure Strategies</p>
+              <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-bold tracking-wider font-sans">
                 {strategiesList.filter(s => s.is_active).length} / {strategiesList.length} ACTIVE
               </span>
             </div>
@@ -583,7 +583,7 @@ export default function App() {
               {strategiesList.map(strat => (
                 <div key={strat.id} className="flex items-center justify-between border-b border-white/[0.02] last:border-0 pb-1.5 last:pb-0">
                   <div>
-                    <p className="text-xs font-bold text-white font-mono uppercase tracking-wide flex items-center gap-1.5">
+                    <p className="text-xs font-bold text-white font-sans uppercase tracking-wide flex items-center gap-1.5">
                       <span className={`w-1.5 h-1.5 rounded-full ${strat.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
                       {strat.name}
                     </p>
@@ -591,7 +591,7 @@ export default function App() {
                       {strat.entry_time_ist} to {strat.exit_time_ist} IST • {strat.underlying}
                     </p>
                   </div>
-                  <span className="text-[9px] text-cyan-400 font-bold font-mono bg-[#0c101d] px-2 py-0.5 rounded border border-cyan-500/10 uppercase">
+                  <span className="text-[9px] text-cyan-400 font-bold font-sans bg-[#0c101d] px-2 py-0.5 rounded border border-cyan-500/10 uppercase">
                     {strat.strike_selection.toUpperCase()}
                   </span>
                 </div>
