@@ -1170,15 +1170,15 @@ export default function App() {
                       <div className="text-[11px] text-gray-400 leading-relaxed">
                         <p className="font-bold text-gray-300">Intraday Safety Protections Armed:</p>
                         <p className="mt-1">
-                          1. Hard Intraday time exit halts strangle positions at **{strat.exit_time_ist} IST** to prevent overnight gap risks.
+                          1. Hard Intraday time exit halts strangle positions at <strong>{strat.exit_time_ist} IST</strong> to prevent overnight gap risks.
                         </p>
                         {isDecay2 ? (
                           <p className="mt-0.5">
-                            2. Native exchange stop loss at **{strat.sl_multiplier}x** entry premium and native take profit at **{strat.underlying_target_pct}x** entry premium.
+                            2. Native exchange stop loss at <strong>{strat.sl_multiplier}x</strong> entry premium and native take profit at <strong>{strat.underlying_target_pct}x</strong> entry premium.
                           </p>
                         ) : (
                           <p className="mt-0.5">
-                            2. If underlying index shifts by **{(strat.underlying_target_pct * 100).toFixed(2)}%** in either direction, both options legs close immediately.
+                            2. If underlying index shifts by <strong>{(strat.underlying_target_pct * 100).toFixed(2)}%</strong> in either direction, both options legs close immediately.
                           </p>
                         )}
                       </div>
