@@ -1237,8 +1237,8 @@ export default function App() {
           <div className="flex items-center gap-3">
             {/* Display latest log briefly in collapsed state */}
             {!consoleExpanded && logs.length > 0 && (
-              <span className="hidden md:inline text-[10px] text-gray-500 font-mono truncate max-w-lg">
-                Latest: {logs[0].message}
+              <span className="hidden md:inline text-[10px] text-gray-500 font-sans truncate max-w-lg">
+                Latest: {logs[0].strategy_name ? `[${logs[0].strategy_name.toUpperCase()}] ` : ''}{logs[0].message}
               </span>
             )}
             {consoleExpanded ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronUp className="w-4 h-4 text-gray-400" />}
@@ -1263,7 +1263,14 @@ export default function App() {
                     <div key={log.id || index} className="flex items-start gap-2 text-gray-400 border-b border-white/[0.01] pb-0.5 hover:bg-white/[0.01] transition-colors">
                       <span className="text-gray-600 shrink-0 font-bold">[{dateStr}]</span>
                       <span className={`${levelColor} shrink-0 w-16 uppercase font-bold`}>[{log.log_level}]</span>
-                      <span className="text-gray-500 shrink-0 font-semibold">{log.account_name || 'SYSTEM'}:</span>
+                      <span className="text-gray-500 shrink-0 font-semibold">
+                        {log.account_name || 'SYSTEM'}
+                        {log.strategy_name && (
+                          <span className="text-[9px] text-cyan-400/80 font-bold ml-1 uppercase">
+                            ({log.strategy_name})
+                          </span>
+                        )}:
+                      </span>
                       <span className="text-gray-300 font-medium">{log.message}</span>
                     </div>
                   )
