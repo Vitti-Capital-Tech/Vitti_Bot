@@ -305,8 +305,8 @@ def execute_decay1_exit(supabase: Client):
 
 def monitor_positions_loop(supabase: Client):
     """
-    Runs as a continuous daemon to monitor spot target (0.75% move)
-    and manual dashboard square-off requests.
+    Runs as a continuous daemon to monitor spot target (0.75% move),
+    reconcile stop losses from Delta Exchange, and handle manual dashboard close requests.
     """
     print("Starting background position monitor...")
     while True:
@@ -329,60 +329,100 @@ def monitor_positions_loop(supabase: Client):
             ticker_map = {t['symbol']: t for t in tickers}
             spot = safe_float(tickers[0]['spot_price']) if tickers else 0.0
             
+            # Group open positions in DB by account to reconcile Stop Losses & minimize API calls
+            accounts_positions = {}
             for pos in open_positions:
-                acc = pos['accounts']
-                symbol = pos['symbol']
-                prod_id = pos['product_id']
-                tp_spot = safe_float(pos['tp_price']) # the underlying spot target (0.75%)
-                entry_price = safe_float(pos['entry_price'])
-                size = pos['size']
-                status = pos.get('status', 'open')
-                is_close_requested = (status == 'close_requested')
+                acc_id = pos['account_id']
+                if acc_id not in accounts_positions:
+                    accounts_positions[acc_id] = []
+                accounts_positions[acc_id].append(pos)
                 
-                # Update current mark price and unrealized PnL
-                ticker = ticker_map.get(symbol)
-                mark_price = entry_price # default fallback
-                if ticker:
-                    mark_price = safe_float(ticker.get('mark_price'), entry_price)
-                    # For short position, PnL = (Entry - Mark) * size
-                    unrealized_pnl = (entry_price - mark_price) * size
-                    
-                    supabase.table('positions').update({
-                        'mark_price': mark_price,
-                        'pnl': round(unrealized_pnl, 6)
-                    }).eq('id', pos['id']).execute()
+            for acc_id, positions_list in accounts_positions.items():
+                acc = positions_list[0]['accounts']
+                trading_client = DeltaClient(acc['api_key'], acc['api_secret'], acc['env'])
                 
-                # Check if underlying spot price hit the 0.75% target or manual dashboard close requested
-                is_call = symbol.startswith('C-')
-                target_hit = False
-                if is_call and spot <= tp_spot:
-                    target_hit = True
-                elif not is_call and spot >= tp_spot:
-                    target_hit = True
+                # Fetch current active positions from Delta Exchange
+                exchange_positions = []
+                try:
+                    exchange_positions = trading_client.get_positions()
+                except Exception as e:
+                    print(f"Error fetching active positions from exchange for {acc['name']}: {e}")
+                    # Set to None to skip reconciliation and avoid false closure updates if API fails
+                    exchange_positions = None
                     
-                if target_hit or is_close_requested:
-                    reason = "Manual Square-off request" if is_close_requested else f"Spot Target Hit ({spot})"
-                    log_trade_event(supabase, acc['name'], f"{reason}. Closing leg {symbol} on exchange...", 'TRADE')
+                active_symbols = set()
+                if exchange_positions is not None:
+                    for ex_pos in exchange_positions:
+                        ex_symbol = ex_pos.get('symbol') or (ex_pos.get('product') and ex_pos['product'].get('symbol'))
+                        ex_size = abs(int(ex_pos.get('size', 0)))
+                        if ex_symbol and ex_size > 0:
+                            active_symbols.add(ex_symbol)
+                            
+                for pos in positions_list:
+                    symbol = pos['symbol']
+                    prod_id = pos['product_id']
+                    tp_spot = safe_float(pos['tp_price']) # the underlying spot target (0.75%)
+                    entry_price = safe_float(pos['entry_price'])
+                    size = pos['size']
+                    status = pos.get('status', 'open')
+                    is_close_requested = (status == 'close_requested')
                     
-                    # Place buy order at market to close the position
-                    trading_client = DeltaClient(acc['api_key'], acc['api_secret'], acc['env'])
-                    try:
-                        trading_client.place_order(
-                            product_id=prod_id,
-                            size=size,
-                            side='buy',
-                            order_type='market_order'
-                        )
+                    # 1. Stop Loss Reconciliation: If marked open in DB but not active on exchange, it was stopped/closed
+                    if status == 'open' and exchange_positions is not None and symbol not in active_symbols:
+                        print(f"Reconciliation: option {symbol} is closed on Delta Exchange. Updating DB status.")
+                        try:
+                            supabase.table('positions').update({
+                                'status': 'closed',
+                                'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                            }).eq('id', pos['id']).execute()
+                            log_trade_event(supabase, acc['name'], f"Exchange reconciled closure: {symbol} was closed by stop-loss or manual trigger.", 'TRADE')
+                        except Exception as db_err:
+                            print(f"Failed to update db status for closed option {symbol}: {db_err}")
+                        continue # Skip further checks since position is closed
+                        
+                    # 2. Update current mark price and unrealized PnL
+                    ticker = ticker_map.get(symbol)
+                    mark_price = entry_price # default fallback
+                    if ticker:
+                        mark_price = safe_float(ticker.get('mark_price'), entry_price)
+                        # For short position, PnL = (Entry - Mark) * size
+                        unrealized_pnl = (entry_price - mark_price) * size
                         
                         supabase.table('positions').update({
-                            'status': 'closed',
-                            'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                            'mark_price': mark_price,
+                            'pnl': round(unrealized_pnl, 6)
                         }).eq('id', pos['id']).execute()
+                    
+                    # 3. Check if underlying spot price hit the 0.75% target or manual dashboard close requested
+                    is_call = symbol.startswith('C-')
+                    target_hit = False
+                    if is_call and spot <= tp_spot:
+                        target_hit = True
+                    elif not is_call and spot >= tp_spot:
+                        target_hit = True
                         
-                        log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} on exchange.", 'TRADE')
-                    except Exception as e:
-                        log_trade_event(supabase, acc['name'], f"Failed to execute close for {symbol}: {e}", 'ERROR')
+                    if target_hit or is_close_requested:
+                        reason = "Manual Square-off request" if is_close_requested else f"Spot Target Hit ({spot})"
+                        log_trade_event(supabase, acc['name'], f"{reason}. Closing leg {symbol} on exchange...", 'TRADE')
                         
+                        # Place buy order at market to close the position
+                        try:
+                            trading_client.place_order(
+                                product_id=prod_id,
+                                size=size,
+                                side='buy',
+                                order_type='market_order'
+                            )
+                            
+                            supabase.table('positions').update({
+                                'status': 'closed',
+                                'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                            }).eq('id', pos['id']).execute()
+                            
+                            log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} on exchange.", 'TRADE')
+                        except Exception as e:
+                            log_trade_event(supabase, acc['name'], f"Failed to execute close for {symbol}: {e}", 'ERROR')
+                            
         except Exception as e:
             print(f"Error in position monitor thread: {e}")
             
