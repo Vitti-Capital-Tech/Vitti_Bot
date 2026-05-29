@@ -745,37 +745,10 @@ export default function App() {
                                     </p>
                                   </div>
                                   <div className="bg-[#080b13]/80 p-3 rounded-xl border border-white/5">
-                                    <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Premium Decayed</p>
-                                    <p className={`text-sm font-extrabold mt-1 ${decayPct >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                      {decayPct.toFixed(2)}%
+                                    <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Account Balance</p>
+                                    <p className="text-sm font-extrabold text-white mt-1">
+                                      {(10000 + pairPnL).toFixed(2)} USDT
                                     </p>
-                                  </div>
-                                </div>
-
-                                {/* PREMIUM DECAY VISUAL PROGRESS METER */}
-                                <div className="flex flex-col gap-2 font-mono text-[9px] text-gray-500 font-bold uppercase tracking-wider">
-                                  <div className="flex justify-between items-center">
-                                    <span>Premium Inflation (Loss Zone)</span>
-                                    <span className="text-cyan-400">Entry Level</span>
-                                    <span>Optimal Premium Decay (Max profit: 100%)</span>
-                                  </div>
-                                  
-                                  <div className="h-2.5 rounded-full bg-[#05070e] overflow-hidden relative border border-white/5">
-                                    {decayPct < 0 ? (
-                                      /* Loss Zone (Bar expands leftwards from the center / red zone) */
-                                      <div 
-                                        className="absolute right-1/2 h-full bg-gradient-to-l from-rose-500 to-rose-700/60 rounded-l-full transition-all duration-300 shadow-[0_0_10px_rgba(239,68,68,0.5)]"
-                                        style={{ width: `${Math.min(Math.abs(decayPct) / 2, 50)}%` }}
-                                      ></div>
-                                    ) : (
-                                      /* Profit Zone (Bar expands rightwards from the center / emerald zone) */
-                                      <div 
-                                        className="absolute left-1/2 h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-r-full transition-all duration-300 shadow-[0_0_10px_#10b981]"
-                                        style={{ width: `${Math.min(decayPct / 2, 50)}%` }}
-                                      ></div>
-                                    )}
-                                    {/* Middle Entry Level Indicator line */}
-                                    <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-cyan-400 shadow-[0_0_8px_#22d3ee] z-20"></div>
                                   </div>
                                 </div>
 
