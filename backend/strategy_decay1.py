@@ -166,6 +166,13 @@ def execute_decay1_entry(supabase: Client):
         
         log_trade_event(supabase, name, f"Starting Decay1 Execution. Spot: {spot}", 'INFO')
         
+        # Pre-emptively clear all active and conditional bracket orders on this account to avoid bracket_order_position_exists blocks
+        try:
+            client.cancel_all_orders()
+            log_trade_event(supabase, name, "Pre-emptively cleared all active and conditional orders on exchange account.", 'INFO')
+        except Exception as cancel_err:
+            print(f"Notice: Failed to clear all orders on exchange for {name}: {cancel_err}")
+            
         # Sizing logic: for this simple deployment, we sell 1 contract (can be made configurable)
         size = 1 
         

@@ -197,3 +197,12 @@ class DeltaClient:
             payload["client_order_id"] = str(client_order_id)
             
         return self.request('DELETE', '/v2/orders', payload=payload)
+
+    def cancel_all_orders(self, product_id: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Cancels all open orders (including conditional bracket orders).
+        """
+        payload = {}
+        if product_id is not None:
+            payload["product_id"] = int(product_id)
+        return self.request('DELETE', '/v2/orders/all', payload=payload)
