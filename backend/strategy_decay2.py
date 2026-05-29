@@ -235,6 +235,13 @@ def execute_decay2_exit(supabase: Client):
                 order_type='market_order'
             )
             
+            # Cancel all resting orders/brackets to avoid false orders later
+            try:
+                client.cancel_all_orders(product_id=pos['product_id'])
+                log_trade_event(supabase, acc['name'], f"Time exit: Cleared resting brackets for {pos['symbol']}.", 'INFO', 'decay2')
+            except Exception as cancel_err:
+                print(f"Notice: Failed to cancel resting orders for time-exited leg {pos['symbol']}: {cancel_err}")
+            
             # Update Supabase Status
             supabase.table('positions').update({
                 'status': 'closed',
@@ -332,6 +339,13 @@ def monitor_positions_loop_decay2(supabase: Client):
                                 log_trade_event(supabase, acc['name'], f"Decay2: Successfully squared off remaining leg {symbol}.", 'TRADE', 'decay2')
                             except Exception as e:
                                 log_trade_event(supabase, acc['name'], f"Decay2: Failed to square off leg {symbol}: {e}", 'ERROR', 'decay2')
+                        
+                        # Pre-emptively clear any remaining bracket orders (SL/TP) on exchange for this contract to prevent false triggers
+                        try:
+                            trading_client.cancel_all_orders(product_id=prod_id)
+                            log_trade_event(supabase, acc['name'], f"Decay2: Cancelled all resting brackets/orders for {symbol}.", 'INFO', 'decay2')
+                        except Exception as cancel_err:
+                            print(f"Notice: Failed to cancel resting orders for {symbol}: {cancel_err}")
                                 
                         try:
                             supabase.table('positions').update({
@@ -361,6 +375,10 @@ def monitor_positions_loop_decay2(supabase: Client):
                                 pass
                                 
         except Exception as e:
-            print(f"Error in Decay2 position monitor loop: {e}")
+            err_msg = str(e)
+            if "Server disconnected" in err_msg or "Connection to Delta Exchange failed" in err_msg or "RemoteProtocolError" in err_msg:
+                print("Notice: Temporary API connection timeout (Server disconnected). Retrying in 10s...")
+            else:
+                print(f"Error in Decay2 position monitor loop: {e}")
             
         time.sleep(10)

@@ -343,6 +343,13 @@ def execute_decay1_exit(supabase: Client):
                 order_type='market_order'
             )
             
+            # Cancel all resting orders/brackets to avoid false orders later
+            try:
+                client.cancel_all_orders(product_id=pos['product_id'])
+                log_trade_event(supabase, acc['name'], f"Time exit: Cleared resting brackets for {pos['symbol']}.", 'INFO', 'decay1')
+            except Exception as cancel_err:
+                print(f"Notice: Failed to cancel resting orders for time-exited leg {pos['symbol']}: {cancel_err}")
+            
             # Update Supabase Status
             supabase.table('positions').update({
                 'status': 'closed',
@@ -467,6 +474,13 @@ def monitor_positions_loop(supabase: Client):
                                 order_type='market_order'
                             )
                             
+                            # Cancel all resting orders/brackets to avoid false orders later
+                            try:
+                                trading_client.cancel_all_orders(product_id=prod_id)
+                                log_trade_event(supabase, acc['name'], f"Decay1: Cancelled all resting brackets/orders for {symbol}.", 'INFO', 'decay1')
+                            except Exception as cancel_err:
+                                print(f"Notice: Failed to cancel resting orders for {symbol}: {cancel_err}")
+                            
                             supabase.table('positions').update({
                                 'status': 'closed',
                                 'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -477,6 +491,10 @@ def monitor_positions_loop(supabase: Client):
                             log_trade_event(supabase, acc['name'], f"Failed to execute close for {symbol}: {e}", 'ERROR', 'decay1')
                             
         except Exception as e:
-            print(f"Error in Decay1 position monitor loop: {e}")
+            err_msg = str(e)
+            if "Server disconnected" in err_msg or "Connection to Delta Exchange failed" in err_msg or "RemoteProtocolError" in err_msg:
+                print("Notice: Temporary API connection timeout (Server disconnected). Retrying in 10s...")
+            else:
+                print(f"Error in Decay1 position monitor loop: {e}")
             
         time.sleep(10)

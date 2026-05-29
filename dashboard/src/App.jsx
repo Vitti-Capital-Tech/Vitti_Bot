@@ -43,6 +43,16 @@ export default function App() {
   const [lastLogId, setLastLogId] = useState(null)
   const [showConfirmModal, setShowConfirmModal] = useState(null) // holds { ids, title, message } or null
   
+  // Real-time strategy config preview state
+  const [formValues, setFormValues] = useState({})
+  
+  const handleFieldChange = (stratName, field, value) => {
+    setFormValues(prev => ({
+      ...prev,
+      [`${stratName}_${field}`]: value
+    }))
+  }
+  
   // UI states
   const [loading, setLoading] = useState(true)
   const [showAddAccountModal, setShowAddAccountModal] = useState(false)
@@ -65,6 +75,11 @@ export default function App() {
     }
     localStorage.setItem('theme', theme)
   }, [theme])
+
+  // Reset strategy config edit forms when changing tabs
+  useEffect(() => {
+    setFormValues({})
+  }, [activeTab])
 
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark')
@@ -271,6 +286,15 @@ export default function App() {
         underlying_target_pct: tgt
       }).eq('id', strat.id)
       showToast(`${strat.name.toUpperCase()} strategy parameters updated.`, 'success')
+      // Clear unsaved edit states for this strategy so it falls back to DB values
+      setFormValues(prev => {
+        const next = { ...prev }
+        delete next[`${strat.name}_sl`]
+        delete next[`${strat.name}_target`]
+        delete next[`${strat.name}_entry`]
+        delete next[`${strat.name}_exit`]
+        return next
+      })
       setRefreshTrigger(prev => prev + 1)
     } catch (err) {
       console.error(err)
@@ -290,10 +314,13 @@ export default function App() {
   // Trigger Confirmation Modal for Entire Strangle close
   const triggerStrangleClose = (positionsList, accountName) => {
     const ids = positionsList.map(p => p.id)
+    const isSingle = ids.length === 1
     setShowConfirmModal({
       ids,
-      title: "Confirm Double Strangle Exit",
-      message: `You are requesting a combined square-off for BOTH Call & Put legs in account [${accountName}]. This will dispatch concurrent market close orders to minimize slippage.`
+      title: isSingle ? "Confirm Single Leg Exit" : "Confirm Double Strangle Exit",
+      message: isSingle
+        ? `You are requesting an emergency square-off for the remaining leg in account [${accountName}]. This will dispatch a market close order.`
+        : `You are requesting a combined square-off for ALL open legs in account [${accountName}]. This will dispatch concurrent market close orders to minimize slippage.`
     })
   }
 
@@ -431,35 +458,37 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#05070e] text-gray-200 flex flex-col font-sans relative overflow-hidden pb-16">
       
-      {/* Decorative High-End Blur Orbs */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[140px] pointer-events-none"></div>
-      <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[180px] pointer-events-none"></div>
-      <div className="absolute bottom-10 left-10 w-96 h-96 bg-emerald-500/[0.02] rounded-full blur-3xl pointer-events-none"></div>
+      {/* Ambient light orbs */}
+      <div className="absolute -top-32 left-1/4 w-[700px] h-[500px] bg-cyan-500/[0.055] rounded-full blur-[160px] pointer-events-none" />
+      <div className="absolute top-1/3 -right-32 w-[600px] h-[600px] bg-indigo-500/[0.05] rounded-full blur-[180px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[500px] h-[400px] bg-emerald-500/[0.03] rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-indigo-600/[0.02] rounded-full blur-[200px] pointer-events-none" />
       
       {/* MAIN HEADER NAVBAR */}
-      <header className="border-b border-white/5 bg-[#070a13]/60 sticky top-0 z-40 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+      <header className="border-b border-white/5 bg-[#070a13]/60 sticky top-0 z-40 backdrop-blur-2xl">
+        {/* Top hairline gradient accent */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
+        <div className="max-w-7xl mx-auto px-6 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4">
+          
+          {/* LEFT — Logo + Live Badge */}
           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shadow-sm">
-                <Shield className="w-5 h-5 text-slate-300" />
-              </div>
-              <div>
+            <div className="flex items-center gap-3.5">
+              {/* Logo mark */}
+              <img src="/logo.jpeg" alt="VittiTrade Logo" className="w-9 h-9 rounded-xl object-cover shadow-lg" />
+              <div className="flex flex-col justify-center">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-extrabold tracking-tight text-white">
-                    DeltaTrade
+                  <h1 className="text-[17px] font-extrabold tracking-tight text-white leading-none">
+                    VittiTrade
                   </h1>
-                  <span className="text-[8px] bg-slate-800 text-slate-300 border border-slate-700 px-1.5 py-0.2 rounded font-bold tracking-widest uppercase">PRO</span>
                 </div>
-                <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-0.5">Automated Intraday Option Strangle Desk</p>
               </div>
             </div>
           </div>
           
-          {/* Navigation Tabs aligned beside the logo/branding */}
-          <div className="flex items-center gap-1 bg-[#090d16]/80 border border-white/[0.04] p-1 rounded-xl w-full md:w-auto overflow-x-auto scrollbar-none">
+          {/* CENTER — Navigation Tabs */}
+          <div className="flex items-center gap-0.5 bg-[#090d16]/80 border border-white/5 p-1 rounded-xl w-full md:w-auto overflow-x-auto scrollbar-none shadow-inner">
             {[
-              { id: 'positions', label: 'Active Strangles', icon: Activity },
+              { id: 'positions', label: 'Live Positions', icon: Activity },
               { id: 'accounts', label: 'Trading Accounts', icon: UserPlus },
               { id: 'config', label: 'Configure Strategies', icon: Sliders }
             ].map(tab => {
@@ -468,143 +497,173 @@ export default function App() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center justify-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 whitespace-nowrap focus:outline-none focus:ring-0 ${
-                    isActive 
-                    ? 'bg-white/[0.06] text-white border border-white/5 shadow-sm' 
-                    : 'text-gray-400 hover:text-gray-200 border border-transparent'
+                  className={`flex items-center justify-center gap-1.5 px-4 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all duration-200 whitespace-nowrap focus:outline-none focus:ring-0 ${
+                    isActive
+                    ? 'tab-active'
+                    : 'text-gray-500 hover:text-gray-300 border border-transparent hover:bg-white/[0.03]'
                   }`}
                 >
-                  <tab.icon className="w-3.5 h-3.5" />
+                  <tab.icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : ''}`} />
                   {tab.label}
                 </button>
               )
             })}
           </div>
           
-          <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-            
-            
-            <div className="flex items-center gap-2">
-              {/* Theme Toggle Button */}
-              <button
-                onClick={toggleTheme}
-                className="p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.08] border border-white/5 hover:border-white/10 transition duration-200"
-                title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              >
-                {theme === 'dark' ? (
-                  <Sun className="w-4 h-4 text-amber-400" />
-                ) : (
-                  <Moon className="w-4 h-4 text-indigo-400" />
-                )}
-              </button>
-
-              <button 
-                onClick={() => {
-                  setRefreshTrigger(prev => prev + 1)
-                  showToast("Manual data sync complete.", 'info')
-                }}
-                className="p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.08] border border-white/5 hover:border-white/10 transition duration-200"
-                title="Sync Data"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : 'text-gray-400'}`} />
-              </button>
-            </div>
+          {/* RIGHT — Controls */}
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <button
+              onClick={toggleTheme}
+              className="p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 transition-all duration-200"
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-indigo-400" />
+              )}
+            </button>
+            <button
+              onClick={() => {
+                setRefreshTrigger(prev => prev + 1)
+                showToast("Manual data sync complete.", 'info')
+              }}
+              className="p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 transition-all duration-200"
+              title="Sync Data"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-cyan-400' : 'text-gray-500'}`} />
+            </button>
           </div>
         </div>
       </header>
 
       {/* MAIN LAYOUT */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-8 z-10">
-        
+
         {/* KPI INSTITUTIONAL METRICS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Performance Box */}
-          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border border-white/[0.04] bg-[#0c101d] hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 shadow-sm">
-            <div className="absolute right-3 bottom-3 opacity-[0.03] pointer-events-none">
-              <DollarSign className="w-28 h-28 text-white" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+          {/* Card 1 — Unrealized PnL */}
+          <div className="glass-panel kpi-card-cyan rounded-2xl p-6 relative border border-white/5 bg-[#0b0f1d] transition-all duration-300">
+            {/* Faint background icon container */}
+            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none select-none">
+              <div className="absolute -right-2 -bottom-2 opacity-[0.025]">
+                <DollarSign className="w-32 h-32 text-cyan-400" />
+              </div>
             </div>
+            {/* Top row */}
             <div className="flex justify-between items-start">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Unrealized Performance</p>
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/15 flex items-center justify-center">
+                  <DollarSign className="w-3 h-3 text-cyan-400" />
+                </div>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Unrealized PnL</p>
+                <div className="tooltip-trigger tooltip-below">
+                  <Info className="w-3 h-3 text-gray-600 hover:text-cyan-400 cursor-help transition-colors" />
+                  <span className="tooltip-content">Real-time consolidated options strangle yield</span>
+                </div>
+              </div>
               <span className={`text-[9px] px-2 py-0.5 rounded-md font-extrabold tracking-wider border ${
-                totalPnL >= 0 
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                totalPnL >= 0
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                 : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
               }`}>
                 {totalPnL >= 0 ? 'PROFIT' : 'DRAWDOWN'}
               </span>
             </div>
-            <h3 className={`text-3xl font-extrabold mt-3 tracking-tight font-sans ${
-              totalPnL >= 0 
-              ? 'text-emerald-400 drop-shadow-[0_0_12px_rgba(16,185,129,0.2)]' 
-              : 'text-rose-400 drop-shadow-[0_0_12px_rgba(239,68,68,0.2)]'
+            {/* Big number */}
+            <h3 className={`text-[2rem] font-black mt-4 tracking-tight font-sans leading-none ${
+              totalPnL >= 0
+              ? 'text-emerald-400 drop-shadow-[0_0_18px_rgba(16,185,129,0.25)]'
+              : 'text-rose-400 drop-shadow-[0_0_18px_rgba(244,63,94,0.25)]'
             }`}>
-              {totalPnL >= 0 ? '+' : ''}{totalPnL.toFixed(4)} <span className="text-sm font-bold text-gray-400">USDT</span>
+              {totalPnL >= 0 ? '+' : ''}{totalPnL.toFixed(4)}
+              <span className="text-sm font-semibold text-gray-500 ml-1.5">USDT</span>
             </h3>
-            <div className="mt-4 flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
-              <Activity className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Real-time consolidated options strangle yield</span>
-            </div>
           </div>
-          
-          {/* Active Workspaces Box */}
-          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border border-white/[0.04] bg-[#0c101d] hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 shadow-sm">
-            <div className="absolute right-3 bottom-3 opacity-[0.03] pointer-events-none">
-              <Layers className="w-28 h-28 text-white" />
+
+          {/* Card 2 — Active Strangle Pairs */}
+          <div className="glass-panel kpi-card-indigo rounded-2xl p-6 relative border border-white/5 bg-[#0b0f1d] transition-all duration-300">
+            {/* Faint background icon container */}
+            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none select-none">
+              <div className="absolute -right-2 -bottom-2 opacity-[0.025]">
+                <Layers className="w-32 h-32 text-indigo-400" />
+              </div>
             </div>
             <div className="flex justify-between items-start">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Live Strangle Pairs</p>
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-lg bg-indigo-500/10 border border-indigo-500/15 flex items-center justify-center">
+                  <Layers className="w-3 h-3 text-indigo-400" />
+                </div>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Active Strangle Pairs</p>
+                <div className="tooltip-trigger tooltip-below">
+                  <Info className="w-3 h-3 text-gray-600 hover:text-indigo-400 cursor-help transition-colors" />
+                  <span className="tooltip-content">Simultaneous strangle monitoring at Delta Exchange</span>
+                </div>
+              </div>
               <span className="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md font-bold tracking-wider font-sans">
                 {activeStrangleAccountsCount} ACCOUNTS
               </span>
             </div>
-            <h3 className="text-3xl font-extrabold mt-3 text-white tracking-tight font-sans">
-              {positions.length} <span className="text-sm font-semibold text-gray-400">Option Legs</span>
+            <h3 className="text-[2rem] font-black mt-4 tracking-tight font-sans leading-none text-white">
+              {positions.length}
+              <span className="text-sm font-semibold text-gray-500 ml-1.5">Option Legs</span>
             </h3>
-            <div className="mt-4 flex items-center gap-1.5 text-[10px] text-gray-500 font-medium">
-              <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Simultaneous strangle monitoring at Delta Exchange</span>
-            </div>
           </div>
 
-          {/* Strategy Details Box */}
-          <div className="glass-panel rounded-2xl p-6 relative overflow-hidden border border-white/[0.04] bg-[#0c101d] hover:border-slate-700 hover:-translate-y-0.5 transition-all duration-300 shadow-sm">
-            <div className="absolute right-3 bottom-3 opacity-[0.03] pointer-events-none">
-              <Sliders className="w-28 h-28 text-white" />
+          {/* Card 3 — Total Strategies */}
+          <div className="glass-panel kpi-card-amber rounded-2xl p-6 relative border border-white/5 bg-[#0b0f1d] transition-all duration-300">
+            {/* Faint background icon container */}
+            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none select-none">
+              <div className="absolute -right-2 -bottom-2 opacity-[0.025]">
+                <Sliders className="w-32 h-32 text-amber-400" />
+              </div>
             </div>
             <div className="flex justify-between items-start">
-              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Configure Strategies</p>
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-lg bg-amber-500/10 border border-amber-500/15 flex items-center justify-center">
+                  <Sliders className="w-3 h-3 text-amber-400" />
+                </div>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Total Strategies</p>
+              </div>
               <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md font-bold tracking-wider font-sans">
                 {strategiesList.filter(s => s.is_active).length} / {strategiesList.length} ACTIVE
               </span>
             </div>
-            
-            <div className="mt-3 flex flex-col gap-2.5">
+            <div className="mt-4 flex flex-col gap-2.5">
               {strategiesList.map(strat => (
-                <div key={strat.id} className="flex items-center justify-between border-b border-white/[0.02] last:border-0 pb-1.5 last:pb-0">
+                <div key={strat.id} className="flex items-center justify-between border-b border-white/[0.03] last:border-0 pb-2 last:pb-0">
                   <div>
                     <p className="text-xs font-bold text-white font-sans uppercase tracking-wide flex items-center gap-1.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${strat.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${strat.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
                       {strat.name}
-                    </p>
-                    <p className="text-[9px] text-gray-500 mt-0.5 font-medium">
-                      {strat.entry_time_ist} to {strat.exit_time_ist} IST • {strat.underlying}
+                      <span className="tooltip-trigger tooltip-below">
+                        <Info className="w-3 h-3 text-gray-600 hover:text-indigo-400 cursor-help transition-colors" />
+                        <span className="tooltip-content">
+                          <div className="flex flex-col gap-1 text-[10px] text-gray-300 font-sans normal-case tracking-normal">
+                            <div>{strat.entry_time_ist} to {strat.exit_time_ist} IST • {strat.underlying}</div>
+                            <div className="font-semibold text-cyan-400 uppercase mt-0.5">{strat.strike_selection.toUpperCase()}</div>
+                          </div>
+                        </span>
+                      </span>
                     </p>
                   </div>
-                  <span className="text-[9px] text-cyan-400 font-bold font-sans bg-[#0c101d] px-2 py-0.5 rounded border border-cyan-500/10 uppercase">
-                    {strat.strike_selection.toUpperCase()}
-                  </span>
+                  <span className={`text-[8px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded border ${
+                    strat.is_active
+                    ? 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15'
+                    : 'text-rose-400 bg-rose-500/8 border-rose-500/15'
+                  }`}>{strat.is_active ? 'On' : 'Off'}</span>
                 </div>
               ))}
               {strategiesList.length === 0 && (
-                <p className="text-xs text-gray-500 mt-2">Loading strategy metrics...</p>
+                <p className="text-xs text-gray-600 mt-1">Loading strategy metrics...</p>
               )}
             </div>
           </div>
         </div>
 
-        {/* MAIN CONSOLE PANEL - Clean, borderless container */}
-        <div className="relative min-h-[500px] w-full flex-1 border-t border-white/[0.04] pt-8">
+        {/* MAIN CONSOLE PANEL */}
+        <div className="relative min-h-[500px] w-full flex-1 border-t border-white/[0.03] pt-8">
             
             {/* POSITIONS & STRANGLE WORKSPACE */}
             <div className={`transition-all duration-350 ease-in-out transform flex flex-col gap-8 ${
@@ -693,6 +752,9 @@ export default function App() {
                     {groupedStrangles.map(group => {
                       const hasActiveStrangle = group.stranglePairs.length > 0 || group.unpaired.length > 0
                       if (!hasActiveStrangle) return null
+                      
+                      const allGroupPositions = [...group.stranglePairs.flatMap(p => [p.call, p.put]), ...group.unpaired]
+                      const isSingleLeg = allGroupPositions.length === 1
 
                       return (
                         <div key={`${group.accountId}_${group.strategyName}`} className="glass-card rounded-2xl border border-white/5 bg-[#0d1222]/30 p-6 flex flex-col gap-6 shadow-xl relative overflow-hidden">
@@ -700,33 +762,36 @@ export default function App() {
                           {/* Top Header Row of Account workspace */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-4 gap-3">
                             <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono text-[10px] font-bold uppercase tracking-wider">
-                                STRANGLE WORKSPACE
-                              </div>
+                              {/* Pulsing Status Indicator */}
+                              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 live-dot shadow-[0_0_8px_rgba(34,211,238,0.4)] shrink-0" />
                               <div>
                                 <h4 className="font-bold text-white text-lg tracking-tight">{group.accountName}</h4>
                                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                   <span className={`text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md ${
                                     group.env === 'production' 
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.03)]' 
                                     : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.05)]'
                                   }`}>
                                     {group.env === 'production' ? 'PROD - REAL FUNDS' : 'SANDBOX TESTNET'}
                                   </span>
-                                  <span className="text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                  <span className="text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.03)]">
                                     STRATEGY: {(group.strategyName || 'decay1').toUpperCase()}
+                                  </span>
+                                  <span className="text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md bg-indigo-500/10 text-indigo-400 border-indigo-500/20 shadow-[0_0_10px_rgba(99,102,241,0.03)]">
+                                    ACTIVE STRANGLE
                                   </span>
                                 </div>
                               </div>
                             </div>
                             
                             {/* Strangle Double Exit Panel */}
-                            <div className="flex items-center gap-3 self-end sm:self-auto">
+                            <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
                               <button
-                                onClick={() => triggerStrangleClose([...group.stranglePairs.flatMap(p => [p.call, p.put]), ...group.unpaired], group.accountName)}
-                                className="px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 hover:border-rose-600 hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300"
+                                onClick={() => triggerStrangleClose(allGroupPositions, group.accountName)}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 hover:border-rose-600 hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300 transform active:scale-95 cursor-pointer shrink-0"
                               >
-                                Square Off Strangle (Both Legs)
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>{isSingleLeg ? "Square Off Remaining Leg" : "Square Off Strangle (Both Legs)"}</span>
                               </button>
                             </div>
                           </div>
@@ -753,25 +818,30 @@ export default function App() {
                             return (
                               <div key={idx} className="flex flex-col gap-6 bg-black/15 p-5 rounded-2xl border border-white/[0.03]">
                                 
-                                {/* Unified Premium Stats */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
-                                  <div className="bg-[#080b13]/80 p-3 rounded-xl border border-white/5">
+                                {/* Unified Premium Stats Ribbon */}
+                                <div className="bg-[#080b13]/80 rounded-xl border border-white/5 divide-y divide-white/5 md:divide-y-0 md:divide-x md:grid md:grid-cols-4 text-xs font-mono">
+                                  <div className="p-4 flex flex-col justify-center">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Strangle Entry Value</p>
-                                    <p className="text-sm font-extrabold text-white mt-1">{entrySum.toFixed(4)} USDT</p>
+                                    <p className="text-sm md:text-base font-black text-white mt-1 font-mono">{entrySum.toFixed(4)} USDT</p>
                                   </div>
-                                  <div className="bg-[#080b13]/80 p-3 rounded-xl border border-white/5">
+                                  <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Strangle Current Mark</p>
-                                    <p className="text-sm font-extrabold text-gray-400 mt-1">{markSum.toFixed(4)} USDT</p>
+                                    <p className="text-sm md:text-base font-black text-gray-400 mt-1 font-mono">{markSum.toFixed(4)} USDT</p>
                                   </div>
-                                  <div className="bg-[#080b13]/80 p-3 rounded-xl border border-white/5">
+                                  <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Strangle Pair PnL</p>
-                                    <p className={`text-sm font-extrabold mt-1 ${pairPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                      {pairPnL >= 0 ? '+' : ''}{pairPnL.toFixed(4)} USDT
-                                    </p>
+                                    <div className="flex flex-wrap items-baseline gap-2 mt-1 font-mono">
+                                      <span className={`text-sm md:text-base font-black ${pairPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {pairPnL >= 0 ? '+' : ''}{pairPnL.toFixed(4)} USDT
+                                      </span>
+                                      <span className={`text-[10px] font-extrabold ${decayPct >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
+                                        ({decayPct >= 0 ? '+' : ''}{decayPct.toFixed(1)}%)
+                                      </span>
+                                    </div>
                                   </div>
-                                  <div className="bg-[#080b13]/80 p-3 rounded-xl border border-white/5">
+                                  <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Account Balance</p>
-                                    <p className="text-sm font-extrabold text-white mt-1">
+                                    <p className="text-sm md:text-base font-black text-white mt-1 font-mono">
                                       {(10000 + pairPnL).toFixed(2)} USDT
                                     </p>
                                   </div>
@@ -787,71 +857,73 @@ export default function App() {
                                     const legParsed = parseOptionSymbol(leg.symbol)
                                     
                                     return (
-                                      <div key={lIdx} className={`p-4 rounded-xl border relative overflow-hidden bg-white/[0.01] ${
+                                      <div key={lIdx} className={`p-4 rounded-xl border relative overflow-hidden bg-white/[0.01] transition-all duration-300 ${
                                         isCall 
-                                        ? 'border-amber-500/10 hover:border-amber-500/20' 
-                                        : 'border-indigo-500/10 hover:border-indigo-500/20'
+                                        ? 'border-amber-500/10 hover:border-amber-500/20 bg-amber-500/[0.005]' 
+                                        : 'border-indigo-500/10 hover:border-indigo-500/20 bg-indigo-500/[0.005]'
                                       }`}>
                                         
-                                        {/* Background icon indicator */}
-                                        <div className="absolute right-2 bottom-0 opacity-[0.01] pointer-events-none font-bold font-mono text-7xl select-none">
+                                        {/* Background indicator */}
+                                        <div className={`absolute right-4 bottom-2 opacity-[0.03] pointer-events-none font-black font-mono text-8xl select-none leading-none ${
+                                          isCall ? 'text-amber-500' : 'text-indigo-500'
+                                        }`}>
                                           {isCall ? 'C' : 'P'}
                                         </div>
 
-                                        <div className="flex justify-between items-center border-b border-white/5 pb-2.5">
+                                        <div className="flex justify-between items-center border-b border-white/5 pb-2.5 gap-2 relative z-10">
                                           <div className="flex items-center gap-2">
                                             <span className="font-extrabold text-white text-sm font-mono tracking-tight">{leg.symbol}</span>
-                                            <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest ${
+                                            <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest border ${
                                               isCall 
-                                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                                              : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                                              ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                              : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
                                             }`}>
                                               {isCall ? 'CALL SHORT' : 'PUT SHORT'}
                                             </span>
                                           </div>
                                           
-                                          <span className={`font-mono text-xs font-bold ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                            {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
-                                          </span>
+                                          <div className="flex items-center gap-3">
+                                            <span className={`font-mono text-xs font-bold shrink-0 ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                              {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
+                                            </span>
+                                            <button
+                                              onClick={() => triggerLegClose(leg.id, leg.symbol)}
+                                              className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all text-[8px] font-bold uppercase tracking-wider shrink-0 cursor-pointer active:scale-95"
+                                            >
+                                              Exit Leg
+                                            </button>
+                                          </div>
                                         </div>
 
-                                        <div className="grid grid-cols-3 gap-3 mt-3.5 text-[10px] font-mono text-gray-500 font-bold uppercase">
-                                           <div>
-                                             <p className="font-sans">Option Strike</p>
-                                             <p className="text-white text-xs mt-1">${legParsed.strike.toLocaleString()}</p>
-                                           </div>
-                                           <div>
-                                             <p className="font-sans">Leg Contract Size</p>
-                                             <p className="text-gray-300 text-xs mt-1">{leg.size} Cont</p>
-                                           </div>
-                                           <div>
-                                             <p className="font-sans">Stop Loss Boundary</p>
-                                             <p className="text-rose-400 text-xs mt-1">${parseFloat(leg.sl_price || 0).toFixed(2)}</p>
-                                           </div>
-                                           <div>
-                                             <p className="font-sans">Entry Price</p>
-                                             <p className="text-gray-400 text-xs mt-1">${parseFloat(leg.entry_price).toFixed(2)}</p>
-                                           </div>
-                                           <div>
-                                             <p className="font-sans">Mark Price</p>
-                                             <p className="text-cyan-400 text-xs mt-1">${parseFloat(leg.mark_price || 0).toFixed(2)}</p>
-                                           </div>
-                                           <div>
-                                             <p className="font-sans">{leg.strategy_name === 'decay2' ? 'Take Profit' : 'Spot Target'}</p>
-                                             <p className="text-emerald-400 text-xs mt-1">
-                                               {leg.strategy_name === 'decay2' ? `$${parseFloat(leg.tp_price || 0).toFixed(2)}` : `$${parseFloat(leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
-                                             </p>
-                                           </div>
-                                         </div>
-
-                                         <div className="flex justify-end mt-4 border-t border-white/5 pt-3">
-                                           <button
-                                             onClick={() => triggerLegClose(leg.id, leg.symbol)}
-                                             className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/25 transition-all text-[8px] font-bold uppercase tracking-wider"
-                                           >
-                                             Exit Leg
-                                           </button>
-                                         </div>
+                                        <div className="grid grid-cols-3 gap-y-3.5 gap-x-2 mt-4 text-[10px] font-mono relative z-10">
+                                          <div className="flex flex-col">
+                                            <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Option Strike</span>
+                                            <span className="text-white text-xs mt-1 font-bold font-mono">${legParsed.strike.toLocaleString()}</span>
+                                          </div>
+                                          <div className="flex flex-col">
+                                            <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Contract Size</span>
+                                            <span className="text-gray-300 text-xs mt-1 font-bold font-mono">{leg.size} Cont</span>
+                                          </div>
+                                          <div className="flex flex-col">
+                                            <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Stop Loss</span>
+                                            <span className="text-rose-400 text-xs mt-1 font-bold font-mono">${parseFloat(leg.sl_price || 0).toFixed(2)}</span>
+                                          </div>
+                                          
+                                          <div className="flex flex-col">
+                                            <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Entry Price</span>
+                                            <span className="text-gray-400 text-xs mt-1 font-bold font-mono">${parseFloat(leg.entry_price).toFixed(2)}</span>
+                                          </div>
+                                          <div className="flex flex-col">
+                                            <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Mark Price</span>
+                                            <span className="text-cyan-400 text-xs mt-1 font-bold font-mono">${parseFloat(leg.mark_price || 0).toFixed(2)}</span>
+                                          </div>
+                                          <div className="flex flex-col">
+                                            <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">{leg.strategy_name === 'decay2' ? 'Take Profit' : 'Spot Target'}</span>
+                                            <span className="text-emerald-400 text-xs mt-1 font-bold font-mono">
+                                              {leg.strategy_name === 'decay2' ? `$${parseFloat(leg.tp_price || 0).toFixed(2)}` : `$${parseFloat(leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                                            </span>
+                                          </div>
+                                        </div>
 
                                       </div>
                                     )
@@ -877,50 +949,71 @@ export default function App() {
                                   const legParsed = parseOptionSymbol(leg.symbol)
 
                                   return (
-                                    <div key={idx} className="p-4 rounded-xl border bg-[#1c0f16]/10 border-rose-500/10 hover:border-rose-500/25 transition relative overflow-hidden">
-                                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                    <div key={idx} className={`p-4 rounded-xl border relative overflow-hidden bg-white/[0.01] transition-all duration-300 ${
+                                      isCall 
+                                      ? 'border-amber-500/10 hover:border-amber-500/20 bg-amber-500/[0.005]' 
+                                      : 'border-indigo-500/10 hover:border-indigo-500/20 bg-indigo-500/[0.005]'
+                                    }`}>
+                                      
+                                      {/* Background indicator */}
+                                      <div className={`absolute right-4 bottom-2 opacity-[0.03] pointer-events-none font-black font-mono text-8xl select-none leading-none ${
+                                        isCall ? 'text-amber-500' : 'text-indigo-500'
+                                      }`}>
+                                        {isCall ? 'C' : 'P'}
+                                      </div>
+
+                                      <div className="flex justify-between items-center border-b border-white/5 pb-2.5 gap-2 relative z-10">
                                         <div className="flex items-center gap-2">
                                           <span className="font-extrabold text-white text-sm font-mono tracking-tight">{leg.symbol}</span>
-                                          <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest ${
-                                            isCall ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                                          <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest border ${
+                                            isCall 
+                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                            : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
                                           }`}>
                                             {isCall ? 'CALL SHORT' : 'PUT SHORT'}
                                           </span>
+                                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                            UNPAIRED
+                                          </span>
                                         </div>
                                         
-                                        <span className={`font-mono text-xs font-bold ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                          {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
-                                        </span>
-                                      </div>
-
-                                      <div className="grid grid-cols-3 gap-3 mt-3 text-[10px] font-mono text-gray-500 font-bold uppercase">
-                                        <div>
-                                          <p className="font-sans">Strike</p>
-                                          <p className="text-white text-xs mt-1">${legParsed.strike.toLocaleString()}</p>
-                                        </div>
-                                        <div>
-                                          <p className="font-sans">Size</p>
-                                          <p className="text-gray-300 text-xs mt-1">{leg.size} Cont</p>
-                                        </div>
-                                        <div>
-                                          <p className="font-sans">SL Trigger</p>
-                                          <p className="text-rose-400 text-xs mt-1">${parseFloat(leg.sl_price || 0).toFixed(2)}</p>
-                                        </div>
-                                        <div>
-                                          <p className="font-sans">Entry Price</p>
-                                          <p className="text-gray-400 text-xs mt-1">${parseFloat(leg.entry_price).toFixed(2)}</p>
-                                        </div>
-                                        <div>
-                                          <p className="font-sans">Mark Price</p>
-                                          <p className="text-cyan-400 text-xs mt-1">${parseFloat(leg.mark_price || 0).toFixed(2)}</p>
-                                        </div>
-                                        <div className="flex items-end justify-end">
+                                        <div className="flex items-center gap-3">
+                                          <span className={`font-mono text-xs font-bold shrink-0 ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
+                                          </span>
                                           <button
                                             onClick={() => triggerLegClose(leg.id, leg.symbol)}
-                                            className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/30 transition text-[8px] font-bold uppercase tracking-wider"
+                                            className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all text-[8px] font-bold uppercase tracking-wider shrink-0 cursor-pointer active:scale-95"
                                           >
                                             Square Off
                                           </button>
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-3 gap-y-3.5 gap-x-2 mt-4 text-[10px] font-mono relative z-10">
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Strike</span>
+                                          <span className="text-white text-xs mt-1 font-bold font-mono">${legParsed.strike.toLocaleString()}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Size</span>
+                                          <span className="text-gray-300 text-xs mt-1 font-bold font-mono">{leg.size} Cont</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">SL Trigger</span>
+                                          <span className="text-rose-400 text-xs mt-1 font-bold font-mono">${parseFloat(leg.sl_price || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Entry Price</span>
+                                          <span className="text-gray-400 text-xs mt-1 font-bold font-mono">${parseFloat(leg.entry_price).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Mark Price</span>
+                                          <span className="text-cyan-400 text-xs mt-1 font-bold font-mono">${parseFloat(leg.mark_price || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Account Balance</span>
+                                          <span className="text-white text-xs mt-1 font-bold font-mono">{(10000 + legPnL).toFixed(2)} USDT</span>
                                         </div>
                                       </div>
                                     </div>
@@ -946,14 +1039,19 @@ export default function App() {
             }`}>
                 
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-white/[0.04] pb-4.5 gap-3">
-                  <div>
-                                    <h3 className="text-base font-bold text-white tracking-wide">Linked API Credentials</h3>
-                    <p className="text-xs text-gray-500">Secure execution layers connecting to Delta Exchange API portal.</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white tracking-wide">Linked API Credentials</h3>
+                    <div className="tooltip-trigger">
+                      <Info className="w-3.5 h-3.5 text-gray-500 hover:text-indigo-400 cursor-help transition-colors" />
+                      <span className="tooltip-content">
+                        Secure execution layers connecting to Delta Exchange API portal.
+                      </span>
+                    </div>
                   </div>
                   
                   <button 
                     onClick={() => setShowAddAccountModal(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold tracking-wider transition-all duration-300 shadow-[0_4px_12px_rgba(79,70,229,0.15)] focus:outline-none focus:ring-0"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-gray-50 text-xs font-semibold tracking-wider transition-all duration-300 shadow-[0_4px_12px_rgba(79,70,229,0.15)] focus:outline-none focus:ring-0"
                   >
                     <UserPlus className="w-4 h-4" />
                     Link New Account
@@ -983,13 +1081,26 @@ export default function App() {
                             : 'from-cyan-400 to-indigo-500'
                           }`}></div>
 
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-extrabold text-white text-lg tracking-tight">{acc.name}</h4>
+                           <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2.5 flex-wrap">
+                                <h4 className="font-extrabold text-white text-lg tracking-tight leading-none">{acc.name}</h4>
+                                {acc.is_active ? (
+                                  <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest font-sans shrink-0">
+                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span>Active</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest font-sans shrink-0">
+                                    <span className="w-1 h-1 rounded-full bg-rose-400" />
+                                    <span>Paused</span>
+                                  </div>
+                                )}
+                              </div>
                               <div className="flex gap-1.5 mt-2.5">
                                 <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest border ${
                                   acc.env === 'production' 
-                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                  ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.03)]' 
                                   : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.05)]'
                                 }`}>
                                   {acc.env === 'production' ? 'Production (Live)' : 'Testnet (Demo)'}
@@ -1007,16 +1118,7 @@ export default function App() {
                               </div>
                             </div>
                             
-                            <div className="flex flex-col items-end gap-2.5 shrink-0">
-                              {/* Explicit Status Badge */}
-                              <span className={`text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md font-sans ${
-                                acc.is_active 
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                              }`}>
-                                {acc.is_active ? 'ACTIVE / RUNNING' : 'DISABLED / PAUSED'}
-                              </span>
-
+                            <div className="flex flex-col items-end gap-2.5 shrink-0 self-center sm:self-start">
                               {/* Buttons Container */}
                               <div className="flex items-center gap-2">
                                 <button 
@@ -1059,6 +1161,26 @@ export default function App() {
             >
               {strategiesList.map(strat => {
                 const isDecay2 = strat.name === 'decay2'
+                const currentSL = formValues[`${strat.name}_sl`] ?? strat.sl_multiplier
+                const currentTarget = formValues[`${strat.name}_target`] ?? strat.underlying_target_pct
+
+                const getSLPercent = (val) => {
+                  const num = parseFloat(val)
+                  if (isNaN(num)) return '0'
+                  return ((num - 1) * 100).toFixed(0)
+                }
+
+                const getTargetPercent = (val, isD2) => {
+                  const num = parseFloat(val)
+                  if (isNaN(num)) return '0'
+                  return (num * 100).toFixed(isD2 ? 0 : 2)
+                }
+
+                const formatTimeForInput = (timeStr) => {
+                  if (!timeStr) return ""
+                  return timeStr.slice(0, 5)
+                }
+
                 return (
                   <form 
                     key={strat.id}
@@ -1067,12 +1189,28 @@ export default function App() {
                   >
                     <div className="border-b border-white/[0.04] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div>
-                        <h3 className="text-base font-bold text-white tracking-wide">{strat.name.toUpperCase()} Option Parameters</h3>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {!isDecay2 
-                            ? 'Fine-tune decay boundaries and underlying asset index move guard rails.' 
-                            : 'Configure short strangle with native bracket stop loss and take profit.'}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-bold text-white tracking-wide">{strat.name.toUpperCase()} Option Parameters</h3>
+                          <div className="tooltip-trigger">
+                            <Info className="w-3.5 h-3.5 text-gray-500 hover:text-indigo-400 cursor-help transition-colors" />
+                            <span className="tooltip-content">
+                              {!isDecay2 
+                                ? 'Fine-tune decay boundaries and underlying asset index move guard rails.' 
+                                : 'Configure short strangle with native bracket stop loss and take profit.'}
+                            </span>
+                          </div>
+                          {strat.is_active ? (
+                            <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest font-sans">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              <span>Active</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest font-sans">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                              <span>Paused</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-3 self-start sm:self-auto shrink-0">
                         <button
@@ -1103,27 +1241,43 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Entry Time (IST)</label>
-                          <span className="text-[9px] text-gray-500 font-medium">Strangle placed on Exchange</span>
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Entry Time (IST)</label>
+                            <div className="tooltip-trigger">
+                              <Info className="w-3 h-3 text-gray-500 hover:text-cyan-400 cursor-help transition-colors" />
+                              <span className="tooltip-content">
+                                Time of day (IST) when the bot starts placing options strangle legs on the exchange.
+                              </span>
+                            </div>
+                          </div>
                         </div>
                         <input 
-                          type="text" 
+                          type="time" 
                           name="entry_time" 
-                          defaultValue={strat.entry_time_ist} 
-                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
+                          value={formatTimeForInput(formValues[`${strat.name}_entry`] ?? strat.entry_time_ist)} 
+                          onChange={(e) => handleFieldChange(strat.name, 'entry', e.target.value)}
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold [color-scheme:dark] w-full"
                         />
                       </div>
                       
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Exit Time (IST)</label>
-                          <span className="text-[9px] text-gray-500 font-medium">Hard session square off</span>
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Exit Time (IST)</label>
+                            <div className="tooltip-trigger">
+                              <Info className="w-3 h-3 text-gray-500 hover:text-cyan-400 cursor-help transition-colors" />
+                              <span className="tooltip-content">
+                                Hard intraday session square-off time (IST) to close out options strangle positions.
+                              </span>
+                            </div>
+                          </div>
                         </div>
                         <input 
-                          type="text" 
+                          type="time" 
                           name="exit_time" 
-                          defaultValue={strat.exit_time_ist} 
-                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
+                          value={formatTimeForInput(formValues[`${strat.name}_exit`] ?? strat.exit_time_ist)} 
+                          onChange={(e) => handleFieldChange(strat.name, 'exit', e.target.value)}
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold [color-scheme:dark] w-full"
                         />
                       </div>
                     </div>
@@ -1131,45 +1285,75 @@ export default function App() {
                     {/* Risk boundaries */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
                           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Stop Loss (SL) Multiplier</label>
-                          <span className="text-[9px] text-rose-400 font-bold uppercase tracking-wider bg-rose-500/5 px-2 rounded border border-rose-500/10 font-sans">
-                            {((strat.sl_multiplier - 1) * 100).toFixed(0)}% SL Leg limit
-                          </span>
+                          <div className="tooltip-trigger">
+                            <Info className="w-3 h-3 text-gray-500 hover:text-cyan-400 cursor-help transition-colors" />
+                            <span className="tooltip-content">
+                              Multiplier applied to entry premium. E.g. 1.40 means a hard stop-loss trigger at 40% loss on a per-leg basis.
+                            </span>
+                          </div>
                         </div>
                         <input 
                           type="number" 
                           step="0.05"
                           name="sl_multiplier" 
-                          defaultValue={strat.sl_multiplier} 
+                          value={formValues[`${strat.name}_sl`] ?? strat.sl_multiplier} 
+                          onChange={(e) => handleFieldChange(strat.name, 'sl', e.target.value)}
                           className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                         />
+                        <div className="flex items-center justify-between px-1.5 mt-0.5">
+                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider font-sans">Computed Limit</span>
+                          <span className="text-[9px] text-rose-400 font-extrabold uppercase tracking-widest bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20 font-mono">
+                            {getSLPercent(currentSL)}% SL Leg limit
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
                           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">
                             {isDecay2 ? 'Take Profit (TP) Multiplier' : 'Favorable Spot Target (%)'}
                           </label>
-                          <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/5 px-2 rounded border border-emerald-500/10 font-sans">
-                            {isDecay2 
-                              ? `${(strat.underlying_target_pct * 100).toFixed(0)}% Premium TP Limit` 
-                              : `${(strat.underlying_target_pct * 100).toFixed(2)}% Spot Move Limit`}
-                          </span>
+                          <div className="tooltip-trigger">
+                            <Info className="w-3 h-3 text-gray-500 hover:text-cyan-400 cursor-help transition-colors" />
+                            <span className="tooltip-content">
+                              {isDecay2 
+                                ? 'Premium target multiplier (e.g. 0.50 triggers take-profit when options premium decays by 50%).' 
+                                : 'Spot target percentage. If the underlying asset moves by this percentage in either direction, both legs close.'}
+                            </span>
+                          </div>
                         </div>
                         <input 
                           type="number" 
                           step={isDecay2 ? '0.05' : '0.0005'}
                           name="target_pct" 
-                          defaultValue={strat.underlying_target_pct} 
+                          value={formValues[`${strat.name}_target`] ?? strat.underlying_target_pct} 
+                          onChange={(e) => handleFieldChange(strat.name, 'target', e.target.value)}
                           className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                         />
+                        <div className="flex items-center justify-between px-1.5 mt-0.5">
+                          <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider font-sans">Computed Limit</span>
+                          <span className="text-[9px] text-emerald-400 font-extrabold uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-mono">
+                            {isDecay2 
+                              ? `${getTargetPercent(currentTarget, true)}% Premium TP Limit` 
+                              : `${getTargetPercent(currentTarget, false)}% Spot Move Limit`}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     {/* Info and save */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Monitored Underlying Index</label>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Monitored Underlying Index</label>
+                        <div className="tooltip-trigger">
+                          <Info className="w-3 h-3 text-gray-500 hover:text-cyan-400 cursor-help transition-colors" />
+                          <span className="tooltip-content">
+                            The underlying asset index monitored for strategy calculations.
+                          </span>
+                        </div>
+                      </div>
                       <input 
                         type="text" 
                         disabled
@@ -1199,9 +1383,9 @@ export default function App() {
 
                     <button 
                       type="submit"
-                      className="w-full py-3 mt-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold tracking-wider text-xs transition duration-300 shadow-[0_4px_12px_rgba(79,70,229,0.15)] focus:outline-none focus:ring-0"
+                      className="w-full py-3 mt-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-gray-50 font-semibold tracking-wider text-xs transition duration-300 shadow-[0_4px_12px_rgba(79,70,229,0.15)] focus:outline-none focus:ring-0"
                     >
-                      Save {strat.name.toUpperCase()} Configuration
+                      Save Configuration
                     </button>
                   </form>
                 )
