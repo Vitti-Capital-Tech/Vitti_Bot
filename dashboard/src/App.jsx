@@ -1007,26 +1007,39 @@ export default function App() {
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-2">
-                              <button 
-                                onClick={() => handleToggleAccount(acc.id, acc.is_active)}
-                                className={`p-2.5 rounded-xl border transition-all duration-300 ${
-                                  acc.is_active 
-                                  ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25 shadow-[0_0_12px_rgba(16,185,129,0.12)]' 
-                                  : 'bg-white/[0.01] text-gray-500 border-white/5'
-                                }`}
-                                title={acc.is_active ? 'Disable Account Execution' : 'Enable Account Execution'}
-                              >
-                                <Power className="w-4 h-4" />
-                              </button>
-                              
-                              <button 
-                                onClick={() => handleDeleteAccount(acc.id)}
-                                className="p-2.5 rounded-xl bg-rose-500/5 hover:bg-rose-500/20 text-rose-400 border border-rose-500/10 hover:border-rose-500/30 transition-all duration-300"
-                                title="Remove Credentials"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                            <div className="flex flex-col items-end gap-2.5 shrink-0">
+                              {/* Explicit Status Badge */}
+                              <span className={`text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md font-sans ${
+                                acc.is_active 
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                              }`}>
+                                {acc.is_active ? 'ACTIVE / RUNNING' : 'DISABLED / PAUSED'}
+                              </span>
+
+                              {/* Buttons Container */}
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={() => handleToggleAccount(acc.id, acc.is_active)}
+                                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[9px] font-extrabold uppercase tracking-wider transition-all duration-300 focus:outline-none focus:ring-0 ${
+                                    acc.is_active 
+                                    ? 'bg-rose-500/15 border-rose-500/25 text-rose-400 hover:bg-rose-600 hover:text-white hover:border-rose-600' 
+                                    : 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
+                                  }`}
+                                  title={acc.is_active ? 'Disable Account Execution' : 'Enable Account Execution'}
+                                >
+                                  <Power className="w-3 h-3" />
+                                  <span>{acc.is_active ? 'Disable' : 'Enable'}</span>
+                                </button>
+                                
+                                <button 
+                                  onClick={() => handleDeleteAccount(acc.id)}
+                                  className="p-2 py-2 rounded-xl bg-rose-500/5 hover:bg-rose-500/20 text-rose-400 border border-rose-500/10 hover:border-rose-500/30 transition-all duration-300 flex items-center justify-center focus:outline-none focus:ring-0"
+                                  title="Remove Credentials"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         </div>
