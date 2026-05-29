@@ -25,7 +25,9 @@ import {
   TrendingDown,
   Info,
   Sun,
-  Moon
+  Moon,
+  Pause,
+  Play
 } from 'lucide-react'
 
 export default function App() {
@@ -206,15 +208,14 @@ export default function App() {
     }
   }
 
-  const handleToggleStrategy = async () => {
-    if (!strategy) return
+  const handleToggleStrategyForObject = async (strat) => {
     try {
-      await supabase.from('strategies').update({ is_active: !strategy.is_active }).eq('id', strategy.id)
+      await supabase.from('strategies').update({ is_active: !strat.is_active }).eq('id', strat.id)
       setRefreshTrigger(prev => prev + 1)
-      showToast(`Strategy ${strategy.name.toUpperCase()} is now ${!strategy.is_active ? 'ENABLED' : 'PAUSED'}.`, !strategy.is_active ? 'success' : 'info')
+      showToast(`Strategy ${strat.name.toUpperCase()} is now ${!strat.is_active ? 'ENABLED' : 'PAUSED'}.`, !strat.is_active ? 'success' : 'info')
     } catch (err) {
       console.error(err)
-      showToast("Failed to toggle strategy.", 'error')
+      showToast(`Failed to toggle ${strat.name.toUpperCase()} strategy.`, 'error')
     }
   }
 
@@ -254,7 +255,7 @@ export default function App() {
     }
   }
 
-  const handleUpdateConfig = async (e) => {
+  const handleUpdateConfigForStrategy = (strat) => async (e) => {
     e.preventDefault()
     const formData = new FormData(e.target)
     const sl = parseFloat(formData.get('sl_multiplier'))
@@ -268,12 +269,12 @@ export default function App() {
         entry_time_ist: entry,
         exit_time_ist: exit,
         underlying_target_pct: tgt
-      }).eq('id', strategy.id)
-      showToast(`${strategy.name.toUpperCase()} strategy parameters updated.`, 'success')
+      }).eq('id', strat.id)
+      showToast(`${strat.name.toUpperCase()} strategy parameters updated.`, 'success')
       setRefreshTrigger(prev => prev + 1)
     } catch (err) {
       console.error(err)
-      showToast("Failed to update strategy config.", 'error')
+      showToast(`Failed to update ${strat.name.toUpperCase()} strategy config.`, 'error')
     }
   }
 
@@ -1035,177 +1036,163 @@ export default function App() {
                 )}
               </div>
 
-            {/* STRATEGY PARAMETERS */}
+            {/* STRATEGY PARAMETERS - SEPARATED CARDS */}
             <div 
-              className={`transition-all duration-350 ease-in-out transform flex flex-col gap-6 max-w-2xl w-full ${
+              className={`transition-all duration-350 ease-in-out transform grid grid-cols-1 xl:grid-cols-2 gap-8 w-full max-w-7xl ${
                 activeTab === 'config' 
                 ? 'visible opacity-100 translate-y-0 scale-100 pointer-events-auto relative z-10' 
                 : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-0 top-0 z-0'
               }`}
             >
-              {/* Strategy Selector Sub-Tabs */}
-              <div className="flex bg-[#070b13]/85 p-1.5 rounded-xl border border-white/5 gap-1.5 w-full">
-                {strategiesList.map(strat => (
-                  <button
+              {strategiesList.map(strat => {
+                const isDecay2 = strat.name === 'decay2'
+                return (
+                  <form 
                     key={strat.id}
-                    type="button"
-                    onClick={() => setSelectedConfigStrategy(strat.name)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-all duration-200 focus:outline-none focus:ring-0 ${
-                      selectedConfigStrategy === strat.name
-                      ? 'bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 text-cyan-400 border border-cyan-500/20 shadow-sm'
-                      : 'text-gray-400 hover:text-gray-200 border border-transparent'
-                    }`}
+                    onSubmit={handleUpdateConfigForStrategy(strat)} 
+                    className="flex flex-col gap-6 bg-black/10 p-6 rounded-2xl border border-white/5 h-fit"
                   >
-                    <span className={`w-1.5 h-1.5 rounded-full ${strat.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-                    {strat.name.toUpperCase()} PARAMETERS
-                  </button>
-                ))}
-              </div>
-
-              {/* Strategy Form Container with Key for clean remount */}
-              {strategy && (
-                <form 
-                  key={strategy.id}
-                  onSubmit={handleUpdateConfig} 
-                  className="flex flex-col gap-6 bg-black/10 p-6 rounded-2xl border border-white/5"
-                >
-                  <div className="border-b border-white/[0.04] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-base font-bold text-white tracking-wide">{strategy.name.toUpperCase()} Option Parameters</h3>
-                      <p className="text-xs text-gray-500">
-                        {strategy.name === 'decay1' 
-                          ? 'Fine-tune decay boundaries and underlying asset index move guard rails.' 
-                          : 'Configure short strangle with native bracket stop loss and take profit.'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 self-start sm:self-auto">
-                      <span className={`text-[9px] px-2 py-0.5 border rounded-md font-bold uppercase tracking-wider font-mono ${
-                        strategy.is_active 
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                      }`}>
-                        {strategy.is_active ? 'ACTIVE' : 'PAUSED'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleToggleStrategy}
-                        className={`px-3 py-1.5 rounded-lg border text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300 focus:outline-none focus:ring-0 ${
-                          strategy.is_active
-                            ? 'bg-rose-500/15 border-rose-500/25 text-rose-400 hover:bg-rose-600 hover:text-white hover:border-rose-600'
-                            : 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-600'
-                        }`}
-                      >
-                        {strategy.is_active ? 'Pause Strategy' : 'Enable Strategy'}
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* Time range parameters */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Entry Time (IST)</label>
-                        <span className="text-[9px] text-gray-500 font-medium">Strangle placed on Exchange</span>
+                    <div className="border-b border-white/[0.04] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-base font-bold text-white tracking-wide">{strat.name.toUpperCase()} Option Parameters</h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {!isDecay2 
+                            ? 'Fine-tune decay boundaries and underlying asset index move guard rails.' 
+                            : 'Configure short strangle with native bracket stop loss and take profit.'}
+                        </p>
                       </div>
-                      <input 
-                        type="text" 
-                        name="entry_time" 
-                        defaultValue={strategy.entry_time_ist} 
-                        className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
-                      />
+                      <div className="flex items-center gap-3 self-start sm:self-auto shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStrategyForObject(strat)}
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300 focus:outline-none focus:ring-0 ${
+                            strat.is_active
+                              ? 'bg-rose-500/15 border-rose-500/25 text-rose-400 hover:bg-rose-600 hover:text-white hover:border-rose-600 shadow-[0_0_12px_rgba(239,68,68,0.1)]'
+                              : 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.1)]'
+                          }`}
+                        >
+                          {strat.is_active ? (
+                            <>
+                              <Pause className="w-3.5 h-3.5" />
+                              Pause Strategy
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-3.5 h-3.5" />
+                              Enable Strategy
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                     
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Exit Time (IST)</label>
-                        <span className="text-[9px] text-gray-500 font-medium">Hard session square off</span>
+                    {/* Time range parameters */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Entry Time (IST)</label>
+                          <span className="text-[9px] text-gray-500 font-medium">Strangle placed on Exchange</span>
+                        </div>
+                        <input 
+                          type="text" 
+                          name="entry_time" 
+                          defaultValue={strat.entry_time_ist} 
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                        />
                       </div>
+                      
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Exit Time (IST)</label>
+                          <span className="text-[9px] text-gray-500 font-medium">Hard session square off</span>
+                        </div>
+                        <input 
+                          type="text" 
+                          name="exit_time" 
+                          defaultValue={strat.exit_time_ist} 
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Risk boundaries */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Stop Loss (SL) Multiplier</label>
+                          <span className="text-[9px] text-rose-400 font-bold uppercase tracking-wider bg-rose-500/5 px-2 rounded border border-rose-500/10 font-mono">
+                            {((strat.sl_multiplier - 1) * 100).toFixed(0)}% SL Leg limit
+                          </span>
+                        </div>
+                        <input 
+                          type="number" 
+                          step="0.05"
+                          name="sl_multiplier" 
+                          defaultValue={strat.sl_multiplier} 
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">
+                            {isDecay2 ? 'Take Profit (TP) Multiplier' : 'Favorable Spot Target (%)'}
+                          </label>
+                          <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/5 px-2 rounded border border-emerald-500/10 font-mono">
+                            {isDecay2 
+                              ? `${(strat.underlying_target_pct * 100).toFixed(0)}% Premium TP Limit` 
+                              : `${(strat.underlying_target_pct * 100).toFixed(2)}% Spot Move Limit`}
+                          </span>
+                        </div>
+                        <input 
+                          type="number" 
+                          step={isDecay2 ? '0.05' : '0.0005'}
+                          name="target_pct" 
+                          defaultValue={strat.underlying_target_pct} 
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Info and save */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Monitored Underlying Index</label>
                       <input 
                         type="text" 
-                        name="exit_time" 
-                        defaultValue={strategy.exit_time_ist} 
-                        className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Risk boundaries */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Stop Loss (SL) Multiplier</label>
-                        <span className="text-[9px] text-rose-400 font-bold uppercase tracking-wider bg-rose-500/5 px-2 rounded border border-rose-500/10 font-mono">
-                          {((strategy.sl_multiplier - 1) * 100).toFixed(0)}% SL Leg limit
-                        </span>
-                      </div>
-                      <input 
-                        type="number" 
-                        step="0.05"
-                        name="sl_multiplier" 
-                        defaultValue={strategy.sl_multiplier} 
-                        className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                        disabled
+                        defaultValue={strat.underlying} 
+                        className="bg-[#070b13] border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-500 font-extrabold focus:outline-none cursor-not-allowed font-mono tracking-widest"
                       />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">
-                          {strategy.name === 'decay2' ? 'Take Profit (TP) Multiplier' : 'Favorable Spot Target (%)'}
-                        </label>
-                        <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/5 px-2 rounded border border-emerald-500/10 font-mono">
-                          {strategy.name === 'decay2' 
-                            ? `${(strategy.underlying_target_pct * 100).toFixed(0)}% Premium TP Limit` 
-                            : `${(strategy.underlying_target_pct * 100).toFixed(2)}% Spot Move Limit`}
-                        </span>
-                      </div>
-                      <input 
-                        type="number" 
-                        step={strategy.name === 'decay2' ? '0.05' : '0.0005'}
-                        name="target_pct" 
-                        defaultValue={strategy.underlying_target_pct} 
-                        className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Info and save */}
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Monitored Underlying Index</label>
-                    <input 
-                      type="text" 
-                      disabled
-                      defaultValue={strategy.underlying} 
-                      className="bg-[#070b13] border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-500 font-extrabold focus:outline-none cursor-not-allowed font-mono tracking-widest"
-                    />
-                  </div>
-
-                  <div className="bg-cyan-500/5 p-4 rounded-xl border border-cyan-500/10 flex gap-3 items-start mt-2">
-                    <Info className="w-5.5 h-5.5 text-cyan-400 shrink-0 mt-0.5" />
-                    <div className="text-[11px] text-gray-400 leading-relaxed">
-                      <p className="font-bold text-gray-300">Intraday Safety Protections Actively Armed:</p>
-                      <p className="mt-1">
-                        1. Hard Intraday time exit halts strangle positions at **{strategy.exit_time_ist} IST** to prevent overnight gap risks.
-                      </p>
-                      {strategy.name === 'decay2' ? (
-                        <p className="mt-0.5">
-                          2. Native exchange stop loss at **{strategy.sl_multiplier}x** entry premium and native take profit at **{strategy.underlying_target_pct}x** entry premium. If either is triggered, the automated daemon will simultaneously exit the other leg.
+                    <div className="bg-cyan-500/5 p-4 rounded-xl border border-cyan-500/10 flex gap-3 items-start mt-2">
+                      <Info className="w-5.5 h-5.5 text-cyan-400 shrink-0 mt-0.5" />
+                      <div className="text-[11px] text-gray-400 leading-relaxed">
+                        <p className="font-bold text-gray-300">Intraday Safety Protections Armed:</p>
+                        <p className="mt-1">
+                          1. Hard Intraday time exit halts strangle positions at **{strat.exit_time_ist} IST** to prevent overnight gap risks.
                         </p>
-                      ) : (
-                        <p className="mt-0.5">
-                          2. If underlying index shifts by **{(strategy.underlying_target_pct * 100).toFixed(2)}%** in either direction from initial entry, both options legs will immediately close to protect capital.
-                        </p>
-                      )}
+                        {isDecay2 ? (
+                          <p className="mt-0.5">
+                            2. Native exchange stop loss at **{strat.sl_multiplier}x** entry premium and native take profit at **{strat.underlying_target_pct}x** entry premium.
+                          </p>
+                        ) : (
+                          <p className="mt-0.5">
+                            2. If underlying index shifts by **{(strat.underlying_target_pct * 100).toFixed(2)}%** in either direction, both options legs close immediately.
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <button 
-                    type="submit"
-                    className="w-full py-3.5 mt-2 rounded-xl bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 text-black font-extrabold uppercase tracking-wider text-xs transition duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
-                  >
-                    Save {strategy.name.toUpperCase()} Configuration
-                  </button>
-                </form>
-              )}
+                    <button 
+                      type="submit"
+                      className="w-full py-3.5 mt-2 rounded-xl bg-gradient-to-r from-cyan-400 to-indigo-500 hover:brightness-110 text-black font-extrabold uppercase tracking-wider text-xs transition duration-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]"
+                    >
+                      Save {strat.name.toUpperCase()} Configuration
+                    </button>
+                  </form>
+                )
+              })}
             </div>
 
         </div>
