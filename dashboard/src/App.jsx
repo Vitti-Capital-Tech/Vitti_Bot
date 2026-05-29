@@ -1090,27 +1090,27 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Entry Time (IST)</label>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Entry Time (IST)</label>
                           <span className="text-[9px] text-gray-500 font-medium">Strangle placed on Exchange</span>
                         </div>
                         <input 
                           type="text" 
                           name="entry_time" 
                           defaultValue={strat.entry_time_ist} 
-                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                         />
                       </div>
                       
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Exit Time (IST)</label>
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Exit Time (IST)</label>
                           <span className="text-[9px] text-gray-500 font-medium">Hard session square off</span>
                         </div>
                         <input 
                           type="text" 
                           name="exit_time" 
                           defaultValue={strat.exit_time_ist} 
-                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                         />
                       </div>
                     </div>
@@ -1119,8 +1119,8 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Stop Loss (SL) Multiplier</label>
-                          <span className="text-[9px] text-rose-400 font-bold uppercase tracking-wider bg-rose-500/5 px-2 rounded border border-rose-500/10 font-mono">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Stop Loss (SL) Multiplier</label>
+                          <span className="text-[9px] text-rose-400 font-bold uppercase tracking-wider bg-rose-500/5 px-2 rounded border border-rose-500/10 font-sans">
                             {((strat.sl_multiplier - 1) * 100).toFixed(0)}% SL Leg limit
                           </span>
                         </div>
@@ -1129,16 +1129,16 @@ export default function App() {
                           step="0.05"
                           name="sl_multiplier" 
                           defaultValue={strat.sl_multiplier} 
-                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                         />
                       </div>
 
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">
                             {isDecay2 ? 'Take Profit (TP) Multiplier' : 'Favorable Spot Target (%)'}
                           </label>
-                          <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/5 px-2 rounded border border-emerald-500/10 font-mono">
+                          <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-500/5 px-2 rounded border border-emerald-500/10 font-sans">
                             {isDecay2 
                               ? `${(strat.underlying_target_pct * 100).toFixed(0)}% Premium TP Limit` 
                               : `${(strat.underlying_target_pct * 100).toFixed(2)}% Spot Move Limit`}
@@ -1149,19 +1149,19 @@ export default function App() {
                           step={isDecay2 ? '0.05' : '0.0005'}
                           name="target_pct" 
                           defaultValue={strat.underlying_target_pct} 
-                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-mono font-bold"
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                         />
                       </div>
                     </div>
 
                     {/* Info and save */}
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-mono">Monitored Underlying Index</label>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Monitored Underlying Index</label>
                       <input 
                         type="text" 
                         disabled
                         defaultValue={strat.underlying} 
-                        className="bg-[#070b13] border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-500 font-extrabold focus:outline-none cursor-not-allowed font-mono tracking-widest"
+                        className="bg-[#070b13] border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-500 font-extrabold focus:outline-none cursor-not-allowed font-sans tracking-wide"
                       />
                     </div>
 
