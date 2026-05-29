@@ -352,6 +352,7 @@ def monitor_positions_loop(supabase: Client):
                 exchange_positions = []
                 try:
                     exchange_positions = trading_client.get_positions(underlying_asset_symbol=underlying_symbol)
+                    print(f"DEBUG: Exchange positions returned for {acc['name']}: {exchange_positions}")
                 except Exception as e:
                     print(f"Error fetching active positions from exchange for {acc['name']}: {e}")
                     # Set to None to skip reconciliation and avoid false closure updates if API fails
@@ -364,6 +365,7 @@ def monitor_positions_loop(supabase: Client):
                         ex_size = abs(int(ex_pos.get('size', 0)))
                         if ex_symbol and ex_size > 0:
                             active_symbols.add(ex_symbol)
+                print(f"DEBUG: Active symbols parsed on exchange: {active_symbols}")
                             
                 for pos in positions_list:
                     symbol = pos['symbol']
