@@ -136,11 +136,14 @@ class DeltaClient:
         """
         return self.request('GET', '/v2/wallet/balances')
 
-    def get_positions(self) -> List[Dict[str, Any]]:
+    def get_positions(self, underlying_asset_symbol: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Fetches current active margined positions.
         """
-        return self.request('GET', '/v2/positions')
+        query_params = {}
+        if underlying_asset_symbol:
+            query_params['underlying_asset_symbol'] = underlying_asset_symbol
+        return self.request('GET', '/v2/positions', query_params=query_params)
 
     def place_order(self, 
                     product_id: int, 

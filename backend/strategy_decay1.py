@@ -341,10 +341,17 @@ def monitor_positions_loop(supabase: Client):
                 acc = positions_list[0]['accounts']
                 trading_client = DeltaClient(acc['api_key'], acc['api_secret'], acc['env'])
                 
+                # Get underlying asset symbol dynamically to comply with Delta API schema
+                underlying_symbol = 'BTC'
+                if positions_list:
+                    parts = positions_list[0]['symbol'].split('-')
+                    if len(parts) >= 2:
+                        underlying_symbol = parts[1]
+                        
                 # Fetch current active positions from Delta Exchange
                 exchange_positions = []
                 try:
-                    exchange_positions = trading_client.get_positions()
+                    exchange_positions = trading_client.get_positions(underlying_asset_symbol=underlying_symbol)
                 except Exception as e:
                     print(f"Error fetching active positions from exchange for {acc['name']}: {e}")
                     # Set to None to skip reconciliation and avoid false closure updates if API fails
