@@ -8,7 +8,8 @@ from strategy_decay1 import (
     safe_float,
     parse_options_chain,
     select_strangle_strikes,
-    log_trade_event
+    log_trade_event,
+    supabase_retry
 )
 
 def execute_decay2_entry(supabase: Client):
@@ -16,7 +17,7 @@ def execute_decay2_entry(supabase: Client):
     Main entry execution logic for Decay2 (decay day2). Called at 13:31 IST.
     """
     # 1. Fetch active accounts from Supabase
-    accounts_res = supabase.table('accounts').select('*').eq('is_active', True).execute()
+    accounts_res = supabase_retry(lambda: supabase.table('accounts').select('*').eq('is_active', True).execute())
     accounts = accounts_res.data
     
     if not accounts:
@@ -24,7 +25,7 @@ def execute_decay2_entry(supabase: Client):
         return
         
     # Fetch Decay2 strategy specs
-    strategy_res = supabase.table('strategies').select('*').eq('name', 'decay2').execute()
+    strategy_res = supabase_retry(lambda: supabase.table('strategies').select('*').eq('name', 'decay2').execute())
     strategy = strategy_res.data[0] if strategy_res.data else None
     
     if not strategy or not strategy.get('is_active'):
@@ -118,8 +119,8 @@ def execute_decay2_entry(supabase: Client):
                         except Exception as close_err:
                             log_trade_event(supabase, name, f"Failed to square off existing position for {symbol}: {close_err}", 'ERROR', 'decay2')
             
-            # Fetch current premium for the leg
-            entry_premium = contract['mark_price'] if contract['mark_price'] > 0 else (contract['best_ask'] or 50.0)
+            # Fetch current premium for the leg (use best_bid for short strangle entry)
+            entry_premium = contract['best_bid'] if contract['best_bid'] > 0 else (contract['mark_price'] if contract['mark_price'] > 0 else 50.0)
             
             # Calculate SL Trigger Premium (2.0x for short strangle decay2)
             sl_price = round(entry_premium * sl_multiplier, 2)
@@ -133,14 +134,12 @@ def execute_decay2_entry(supabase: Client):
                 except Exception:
                     pass
                     
-                # Place Sell Order at market with BOTH bracket SL and bracket TP attached!
+                # Place Sell Order at market without native exchange brackets (monitored in python)
                 order = client.place_order(
                     product_id=prod_id,
                     size=size,
                     side='sell',
                     order_type='market_order',
-                    sl_price=str(sl_price),
-                    tp_price=str(tp_premium),
                     client_order_id=f"decay2_{leg.lower()}_{int(time.time())}"
                 )
                 
@@ -165,7 +164,7 @@ def execute_decay2_entry(supabase: Client):
                     'entry_order_id': order.get('id')
                 }).execute()
                 
-                log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss: {sl_price}. Take Profit: {tp_premium}", 'TRADE', 'decay2')
+                log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Take Profit (Local): {tp_premium}", 'TRADE', 'decay2')
                 
             except Exception as e:
                 err_str = str(e)
@@ -176,14 +175,13 @@ def execute_decay2_entry(supabase: Client):
                         if best_ask <= 0.0:
                             best_ask = entry_premium
                             
+                        # Place limit order without native exchange brackets (monitored in python)
                         order = client.place_order(
                             product_id=prod_id,
                             size=size,
                             side='sell',
                             order_type='limit_order',
                             limit_price=str(best_ask),
-                            sl_price=str(sl_price),
-                            tp_price=str(tp_premium),
                             client_order_id=f"decay2_{leg.lower()}_lim_{int(time.time())}"
                         )
                         
@@ -205,7 +203,7 @@ def execute_decay2_entry(supabase: Client):
                             'entry_order_id': order.get('id')
                         }).execute()
                         
-                        log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss: {sl_price}. Take Profit: {tp_premium}", 'TRADE', 'decay2')
+                        log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Local): {sl_price}. Take Profit (Local): {tp_premium}", 'TRADE', 'decay2')
                     except Exception as limit_err:
                         log_trade_event(supabase, name, f"Limit order fallback also failed for {symbol}: {limit_err}", 'ERROR', 'decay2')
                 else:
@@ -307,10 +305,18 @@ def monitor_positions_loop_decay2(supabase: Client):
                 has_closure_trigger = False
                 trigger_reason = ""
                 
-                # Check for triggers (manual close requests or natively filled legs)
+                # Check for triggers (manual close requests or python-reconciled SL/TP hits)
                 for pos in positions_list:
                     symbol = pos['symbol']
                     status = pos.get('status', 'open')
+                    sl_price = safe_float(pos.get('sl_price'))
+                    tp_price = safe_float(pos.get('tp_price'))
+                    
+                    ticker = ticker_map.get(symbol)
+                    best_ask = 0.0
+                    if ticker:
+                        quotes = ticker.get('quotes', {})
+                        best_ask = safe_float(quotes.get('best_ask')) if quotes else 0.0
                     
                     if status == 'close_requested':
                         has_closure_trigger = True
@@ -318,8 +324,19 @@ def monitor_positions_loop_decay2(supabase: Client):
                         break
                     elif status == 'open' and exchange_positions is not None and symbol not in active_symbols:
                         has_closure_trigger = True
-                        trigger_reason = f"Leg {symbol} was closed natively on exchange (Stop Loss or Take Profit hit)."
+                        trigger_reason = f"Leg {symbol} was manually closed on Delta Exchange."
                         break
+                    elif status == 'open' and best_ask > 0:
+                        # Monitor Stop Loss
+                        if sl_price > 0 and best_ask >= sl_price:
+                            has_closure_trigger = True
+                            trigger_reason = f"Leg {symbol} hit Stop Loss (Ask: {best_ask} >= SL: {sl_price})."
+                            break
+                        # Monitor Take Profit
+                        if tp_price > 0 and best_ask <= tp_price:
+                            has_closure_trigger = True
+                            trigger_reason = f"Leg {symbol} hit Take Profit (Ask: {best_ask} <= TP: {tp_price})."
+                            break
                         
                 if has_closure_trigger:
                     log_trade_event(supabase, acc['name'], f"Decay2: Joint exit triggered -> {trigger_reason}", 'TRADE', 'decay2')
@@ -349,13 +366,13 @@ def monitor_positions_loop_decay2(supabase: Client):
                                 
                         try:
                             supabase.table('positions').update({
-                                'status': 'closed',
-                                'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                                    'status': 'closed',
+                                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
                             }).eq('id', pos['id']).execute()
                         except Exception as db_err:
                             print(f"Failed to update db status for Decay2 leg {symbol}: {db_err}")
                 else:
-                    # Update active marks and unrealized PnL
+                    # Update active marks and unrealized PnL (to close we buy back, so we use best_ask)
                     for pos in positions_list:
                         symbol = pos['symbol']
                         entry_price = safe_float(pos['entry_price'])
@@ -363,12 +380,14 @@ def monitor_positions_loop_decay2(supabase: Client):
                         
                         ticker = ticker_map.get(symbol)
                         if ticker:
-                            mark_price = safe_float(ticker.get('mark_price'), entry_price)
-                            unrealized_pnl = (entry_price - mark_price) * size
+                            quotes = ticker.get('quotes', {})
+                            best_ask = safe_float(quotes.get('best_ask')) if quotes else 0.0
+                            ask_price = best_ask if best_ask > 0 else safe_float(ticker.get('mark_price'), entry_price)
+                            unrealized_pnl = (entry_price - ask_price) * size
                             
                             try:
                                 supabase.table('positions').update({
-                                    'mark_price': mark_price,
+                                    'mark_price': ask_price,
                                     'pnl': round(unrealized_pnl, 6)
                                 }).eq('id', pos['id']).execute()
                             except Exception:

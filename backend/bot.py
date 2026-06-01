@@ -60,53 +60,72 @@ def main():
     tz = timezone(config.TIMEZONE)
     scheduler = BlockingScheduler(timezone=tz)
     
-    # Schedule Decay1 Entry: Monday to Friday at 08:31 AM IST
+    # 4. Fetch dynamic strategy execution times from Supabase
+    strategies_res = supabase.table('strategies').select('*').execute()
+    strategies = {s['name']: s for s in strategies_res.data} if strategies_res.data else {}
+    
+    def parse_time_ist(time_str: str, default_hour: int, default_min: int):
+        if not time_str:
+            return default_hour, default_min
+        try:
+            parts = time_str.split(':')
+            return int(parts[0]), int(parts[1])
+        except Exception:
+            return default_hour, default_min
+
+    # --- Schedule Decay1 ---
+    d1 = strategies.get('decay1', {})
+    d1_entry_h, d1_entry_m = parse_time_ist(d1.get('entry_time_ist'), 8, 31)
+    d1_exit_h, d1_exit_m = parse_time_ist(d1.get('exit_time_ist'), 12, 29)
+
     scheduler.add_job(
         func=execute_decay1_entry,
         trigger='cron',
         day_of_week='mon-fri',
-        hour=8,
-        minute=31,
+        hour=d1_entry_h,
+        minute=d1_entry_m,
         args=[supabase],
         name='decay1_entry'
     )
-    print("Scheduled Decay1 entry job: Monday-Friday at 08:31 IST.")
+    print(f"Scheduled Decay1 entry job: Monday-Friday at {d1_entry_h:02d}:{d1_entry_m:02d} IST.")
     
-    # Schedule Decay1 Exit: Monday to Friday at 12:29 PM IST
     scheduler.add_job(
         func=execute_decay1_exit,
         trigger='cron',
         day_of_week='mon-fri',
-        hour=12,
-        minute=29,
+        hour=d1_exit_h,
+        minute=d1_exit_m,
         args=[supabase],
         name='decay1_exit'
     )
-    print("Scheduled Decay1 exit job: Monday-Friday at 12:29 IST.")
+    print(f"Scheduled Decay1 exit job: Monday-Friday at {d1_exit_h:02d}:{d1_exit_m:02d} IST.")
 
-    # Schedule Decay2 Entry: Monday to Friday at 01:31 PM IST (13:31)
+    # --- Schedule Decay2 ---
+    d2 = strategies.get('decay2', {})
+    d2_entry_h, d2_entry_m = parse_time_ist(d2.get('entry_time_ist'), 13, 31)
+    d2_exit_h, d2_exit_m = parse_time_ist(d2.get('exit_time_ist'), 17, 29)
+
     scheduler.add_job(
         func=execute_decay2_entry,
         trigger='cron',
         day_of_week='mon-fri',
-        hour=13,
-        minute=31,
+        hour=d2_entry_h,
+        minute=d2_entry_m,
         args=[supabase],
         name='decay2_entry'
     )
-    print("Scheduled Decay2 entry job: Monday-Friday at 13:31 IST.")
+    print(f"Scheduled Decay2 entry job: Monday-Friday at {d2_entry_h:02d}:{d2_entry_m:02d} IST.")
     
-    # Schedule Decay2 Exit: Monday to Friday at 05:29 PM IST (17:29)
     scheduler.add_job(
         func=execute_decay2_exit,
         trigger='cron',
         day_of_week='mon-fri',
-        hour=17,
-        minute=29,
+        hour=d2_exit_h,
+        minute=d2_exit_m,
         args=[supabase],
         name='decay2_exit'
     )
-    print("Scheduled Decay2 exit job: Monday-Friday at 17:29 IST.")
+    print(f"Scheduled Decay2 exit job: Monday-Friday at {d2_exit_h:02d}:{d2_exit_m:02d} IST.")
 
 
     # 4. Launch Scheduler

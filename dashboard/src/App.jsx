@@ -277,13 +277,15 @@ export default function App() {
     const entry = formData.get('entry_time')
     const exit = formData.get('exit_time')
     const tgt = parseFloat(formData.get('target_pct'))
+    const strike = formData.get('strike_selection')
     
     try {
       await supabase.from('strategies').update({
         sl_multiplier: sl,
         entry_time_ist: entry,
         exit_time_ist: exit,
-        underlying_target_pct: tgt
+        underlying_target_pct: tgt,
+        strike_selection: strike
       }).eq('id', strat.id)
       showToast(`${strat.name.toUpperCase()} strategy parameters updated.`, 'success')
       // Clear unsaved edit states for this strategy so it falls back to DB values
@@ -293,6 +295,7 @@ export default function App() {
         delete next[`${strat.name}_target`]
         delete next[`${strat.name}_entry`]
         delete next[`${strat.name}_exit`]
+        delete next[`${strat.name}_strike`]
         return next
       })
       setRefreshTrigger(prev => prev + 1)
@@ -474,11 +477,11 @@ export default function App() {
           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-start">
             <div className="flex items-center gap-3.5">
               {/* Logo mark */}
-              <img src="/logo.jpeg" alt="VittiTrade Logo" className="w-9 h-9 rounded-xl object-cover shadow-lg" />
+              <img src="/logo.jpeg" alt="VITTI Bot Logo" className="w-9 h-9 rounded-xl object-cover shadow-lg" />
               <div className="flex flex-col justify-center">
                 <div className="flex items-center gap-2">
                   <h1 className="text-[17px] font-extrabold tracking-tight text-white leading-none">
-                    VittiTrade
+                    VITTI Bot
                   </h1>
                 </div>
               </div>
@@ -1343,23 +1346,50 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Info and save */}
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Monitored Underlying Index</label>
-                        <div className="tooltip-trigger">
-                          <Info className="w-3 h-3 text-gray-500 hover:text-cyan-400 cursor-help transition-colors" />
-                          <span className="tooltip-content">
-                            The underlying asset index monitored for strategy calculations.
-                          </span>
+                    {/* Strike Selection & Monitored Index */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Strike Selection (OTM)</label>
+                          <div className="tooltip-trigger">
+                            <Info className="w-3 h-3 text-gray-500 hover:text-cyan-400 cursor-help transition-colors" />
+                            <span className="tooltip-content">
+                              Selects how far Out-Of-The-Money options are picked. OTM1 is closest to spot (high premium & liquidity); OTM6 is furthest out (cheap premium & illiquid).
+                            </span>
+                          </div>
                         </div>
+                        <select 
+                          name="strike_selection" 
+                          value={formValues[`${strat.name}_strike`] ?? strat.strike_selection ?? "otm6"} 
+                          onChange={(e) => handleFieldChange(strat.name, 'strike', e.target.value)}
+                          className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold cursor-pointer"
+                        >
+                          <option value="otm1">OTM 1 (High Liquidity / Premium)</option>
+                          <option value="otm2">OTM 2 (Medium High)</option>
+                          <option value="otm3">OTM 3 (Medium)</option>
+                          <option value="otm4">OTM 4 (Medium Low)</option>
+                          <option value="otm5">OTM 5 (Low)</option>
+                          <option value="otm6">OTM 6 (Deep OTM / Cheap)</option>
+                        </select>
                       </div>
-                      <input 
-                        type="text" 
-                        disabled
-                        defaultValue={strat.underlying} 
-                        className="bg-[#070b13] border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-500 font-extrabold focus:outline-none cursor-not-allowed font-sans tracking-wide"
-                      />
+
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest font-sans">Monitored Index</label>
+                          <div className="tooltip-trigger">
+                            <Info className="w-3 h-3 text-gray-500 hover:text-cyan-400 cursor-help transition-colors" />
+                            <span className="tooltip-content">
+                              The underlying asset index monitored for strategy calculations.
+                            </span>
+                          </div>
+                        </div>
+                        <input 
+                          type="text" 
+                          disabled
+                          defaultValue={strat.underlying} 
+                          className="bg-[#070b13] border border-white/5 rounded-xl px-4 py-3 text-sm text-gray-500 font-extrabold focus:outline-none cursor-not-allowed font-sans tracking-wide"
+                        />
+                      </div>
                     </div>
 
                     <div className="bg-cyan-500/5 p-4 rounded-xl border border-cyan-500/10 flex gap-3 items-start mt-2">
@@ -1375,7 +1405,7 @@ export default function App() {
                           </p>
                         ) : (
                           <p className="mt-0.5">
-                            2. If underlying index shifts by <strong>{(strat.underlying_target_pct * 100).toFixed(2)}%</strong> in either direction, both options legs close immediately.
+                            2. If the underlying index hits the <strong>{(strat.underlying_target_pct * 100).toFixed(2)}%</strong> spot target for an option leg, only that specific leg closes immediately.
                           </p>
                         )}
                       </div>

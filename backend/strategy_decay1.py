@@ -87,17 +87,35 @@ def select_strangle_strikes(parsed_options: List[Dict[str, Any]], spot: float, s
         'P': selected_put
     }
 
+def supabase_retry(query_func, retries=3, delay=2):
+    """
+    Executes a Supabase query function and automatically retries if a network timeout
+    or connection disconnect (e.g. RemoteProtocolError) occurs.
+    """
+    import time
+    for i in range(retries):
+        try:
+            return query_func()
+        except Exception as e:
+            err_str = str(e)
+            if "Server disconnected" in err_str or "RemoteProtocolError" in err_str or "timeout" in err_str.lower() or i == retries - 1:
+                if i < retries - 1:
+                    print(f"Notice: Supabase query failed ({e}). Retrying in {delay}s...")
+                    time.sleep(delay)
+                    continue
+            raise e
+
 def log_trade_event(supabase: Client, account_name: str, message: str, level: str = 'INFO', strategy_name: str = 'decay1'):
     """
     Pushes a real-time event log to the Supabase database.
     """
     try:
-        supabase.table('trade_logs').insert({
+        supabase_retry(lambda: supabase.table('trade_logs').insert({
             'account_name': account_name,
             'strategy_name': strategy_name,
             'message': message,
             'log_level': level
-        }).execute()
+        }).execute())
         print(f"[{level}] {account_name} ({strategy_name}): {message}")
     except Exception as e:
         print(f"Failed to write log to database: {e}")
@@ -108,7 +126,7 @@ def execute_decay1_entry(supabase: Client):
     Main entry execution logic for Decay1. Called at 08:31 IST.
     """
     # 1. Fetch active accounts from Supabase
-    accounts_res = supabase.table('accounts').select('*').eq('is_active', True).execute()
+    accounts_res = supabase_retry(lambda: supabase.table('accounts').select('*').eq('is_active', True).execute())
     accounts = accounts_res.data
     
     if not accounts:
@@ -116,7 +134,7 @@ def execute_decay1_entry(supabase: Client):
         return
         
     # Fetch Decay1 strategy specs
-    strategy_res = supabase.table('strategies').select('*').eq('name', 'decay1').execute()
+    strategy_res = supabase_retry(lambda: supabase.table('strategies').select('*').eq('name', 'decay1').execute())
     strategy = strategy_res.data[0] if strategy_res.data else None
     
     if not strategy or not strategy.get('is_active'):
@@ -217,8 +235,8 @@ def execute_decay1_entry(supabase: Client):
                                 pass
                         except Exception as close_err:
                             log_trade_event(supabase, name, f"Failed to square off existing position for {symbol}: {close_err}", 'ERROR')
-            # Fetch current premium for the leg
-            entry_premium = contract['mark_price'] if contract['mark_price'] > 0 else (contract['best_ask'] or 50.0)
+            # Fetch current premium for the leg (use best_bid for short strangle entry)
+            entry_premium = contract['best_bid'] if contract['best_bid'] > 0 else (contract['mark_price'] if contract['mark_price'] > 0 else 50.0)
             
             # Calculate SL Trigger Premium (1.40x for short strangle)
             sl_price = round(entry_premium * sl_multiplier, 2)
@@ -238,13 +256,12 @@ def execute_decay1_entry(supabase: Client):
                 except Exception:
                     pass
                     
-                # Place Sell Order at market with bracket SL attached
+                # Place Sell Order at market without native exchange bracket (monitored in python)
                 order = client.place_order(
                     product_id=prod_id,
                     size=size,
                     side='sell',
                     order_type='market_order',
-                    sl_price=str(sl_price),
                     client_order_id=f"decay1_{leg.lower()}_{int(time.time())}"
                 )
                 
@@ -270,7 +287,7 @@ def execute_decay1_entry(supabase: Client):
                     'entry_order_id': order.get('id')
                 }).execute()
                 
-                log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss placed at {sl_price}. Spot Target: {tp_spot}", 'TRADE')
+                log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Spot Target: {tp_spot}", 'TRADE')
                 
             except Exception as e:
                 err_str = str(e)
@@ -282,14 +299,13 @@ def execute_decay1_entry(supabase: Client):
                         if best_ask <= 0.0:
                             best_ask = entry_premium
                             
-                        # Place limit order with bracket stop loss attached
+                        # Place limit order without native exchange bracket (monitored in python)
                         order = client.place_order(
                             product_id=prod_id,
                             size=size,
                             side='sell',
                             order_type='limit_order',
                             limit_price=str(best_ask),
-                            sl_price=str(sl_price),
                             client_order_id=f"decay1_{leg.lower()}_lim_{int(time.time())}"
                         )
                         
@@ -313,7 +329,7 @@ def execute_decay1_entry(supabase: Client):
                             'entry_order_id': order.get('id')
                         }).execute()
                         
-                        log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss placed at {sl_price}. Spot Target: {tp_spot}", 'TRADE')
+                        log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Local): {sl_price}. Spot Target: {tp_spot}", 'TRADE')
                     except Exception as limit_err:
                         log_trade_event(supabase, name, f"Limit order fallback also failed for {symbol}: {limit_err}", 'ERROR')
                 else:
@@ -423,13 +439,30 @@ def monitor_positions_loop(supabase: Client):
                 for pos in positions_list:
                     symbol = pos['symbol']
                     prod_id = pos['product_id']
+                    sl_price = safe_float(pos.get('sl_price'))
                     tp_spot = safe_float(pos['tp_price']) # the underlying spot target (0.75%)
                     entry_price = safe_float(pos['entry_price'])
                     size = pos['size']
                     status = pos.get('status', 'open')
                     is_close_requested = (status == 'close_requested')
                     
-                    # 1. Stop Loss Reconciliation
+                    # 1. Update current mark price (to close we buy back, so we use best_ask) and unrealized PnL
+                    ticker = ticker_map.get(symbol)
+                    ask_price = entry_price
+                    best_ask = 0.0
+                    if ticker:
+                        quotes = ticker.get('quotes', {})
+                        best_ask = safe_float(quotes.get('best_ask')) if quotes else 0.0
+                        ask_price = best_ask if best_ask > 0 else safe_float(ticker.get('mark_price'), entry_price)
+                        unrealized_pnl = (entry_price - ask_price) * size
+                        print(f"[MONITOR DEBUG] {symbol} | Entry: {entry_price} | Ask: {ask_price} | PnL: {unrealized_pnl:.4f} USDT | SL: {sl_price}")
+                        
+                        supabase.table('positions').update({
+                            'mark_price': ask_price,
+                            'pnl': round(unrealized_pnl, 6)
+                        }).eq('id', pos['id']).execute()
+                    
+                    # 2. Reconcile if position was manually closed on Delta Exchange directly
                     if status == 'open' and exchange_positions is not None and symbol not in active_symbols:
                         print(f"Reconciliation: option {symbol} is closed on Delta Exchange. Updating DB status.")
                         try:
@@ -437,24 +470,13 @@ def monitor_positions_loop(supabase: Client):
                                 'status': 'closed',
                                 'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
                             }).eq('id', pos['id']).execute()
-                            log_trade_event(supabase, acc['name'], f"Exchange reconciled closure: {symbol} was closed by stop-loss or manual trigger.", 'TRADE', 'decay1')
+                            log_trade_event(supabase, acc['name'], f"Exchange reconciled manual closure of {symbol}.", 'TRADE', 'decay1')
                         except Exception as db_err:
                             print(f"Failed to update db status for closed option {symbol}: {db_err}")
                         continue
                         
-                    # 2. Update current mark price and unrealized PnL
-                    ticker = ticker_map.get(symbol)
-                    mark_price = entry_price
-                    if ticker:
-                        mark_price = safe_float(ticker.get('mark_price'), entry_price)
-                        unrealized_pnl = (entry_price - mark_price) * size
-                        
-                        supabase.table('positions').update({
-                            'mark_price': mark_price,
-                            'pnl': round(unrealized_pnl, 6)
-                        }).eq('id', pos['id']).execute()
-                    
-                    # 3. Check if underlying spot price hit the 0.75% target or manual dashboard close requested
+                    # 3. Check Stop Loss (using Ask price) and Take Profit Spot target
+                    sl_hit = (best_ask >= sl_price) if (best_ask > 0 and sl_price > 0) else False
                     is_call = symbol.startswith('C-')
                     target_hit = False
                     if is_call and spot <= tp_spot:
@@ -462,8 +484,14 @@ def monitor_positions_loop(supabase: Client):
                     elif not is_call and spot >= tp_spot:
                         target_hit = True
                         
-                    if target_hit or is_close_requested:
-                        reason = "Manual Square-off request" if is_close_requested else f"Spot Target Hit ({spot})"
+                    if sl_hit or target_hit or is_close_requested:
+                        if sl_hit:
+                            reason = f"Stop Loss Premium Hit (Ask: {best_ask} >= SL: {sl_price})"
+                        elif is_close_requested:
+                            reason = "Manual Square-off request"
+                        else:
+                            reason = f"Spot Target Hit ({spot})"
+                            
                         log_trade_event(supabase, acc['name'], f"{reason}. Closing leg {symbol} on exchange...", 'TRADE', 'decay1')
                         
                         try:

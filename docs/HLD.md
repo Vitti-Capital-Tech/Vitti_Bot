@@ -87,35 +87,36 @@ graph LR
 ```
 
 ### Risk Controls
-*   **OTM6 Strike Selection**: The bot looks at the options chain and selects Call and Put options that are **6 strikes away** from the current spot price (highly out-of-the-money, representing low probability of being crossed).
-*   **Leg-wise Stop Loss (+40%)**: If the premium of either option increases by **40%** above its entry price (indicating an adverse price move), the bot automatically closes *only* that specific leg at market price to prevent runaway losses.
-*   **Underlying Spot Target (0.75%)**: If the price of the underlying asset (BTC spot) moves by **0.75%** or more in either direction from the initial strangle entry level, the bot immediately triggers an exit for **both** legs, protecting capital.
+*   **Dynamic Strike Selection (OTM1 to OTM6)**: The bot allows users to dynamically configure the option strike selection from the dashboard. OTM1 offers high liquidity and premiums, while OTM6 offers deeper out-of-the-money targets.
+*   **Python-Managed leg-wise Stop Loss**: Stop-loss risk is managed entirely by the local Python background daemon using live **`best_ask`** market prices (since closing short options requires buying them back at the ask premium). If `best_ask >= sl_price`, the bot immediately fires a market buy order to close the leg, bypassing slow or rigid exchange-native triggers.
+*   **Underlying Spot Target (Decay 1)**: If the price of the underlying asset (BTC spot) moves past the configured target percentage in either direction from the initial strangle entry level, the bot immediately triggers a market close for that specific leg.
+*   **Joint Exit Protection (Decay 2)**: If either strangle leg is hit (Stop Loss or Take Profit), the bot immediately triggers a joint exit to square off the remaining leg at market, neutralizing active portfolio risk.
 
 ---
 
 ## 3. Daily Execution Timeline (IST Timezone)
 
-The strategy operates strictly as an **intraday** session, avoiding overnight volatility risks:
+The strategy operates strictly as an **intraday** session based on dynamic schedules saved in your database:
 
 ```mermaid
 gantt
-    title Decay1 Intraday Strangle Lifecycle
+    title Intraday Strangle Lifecycle
     dateFormat  HH:mm
     axisFormat %H:%M
     
     section Intraday Session
-    Bot Scheduler Active           :active, 08:30, 12:35
+    Bot Scheduler Active           :active, 09:30, 16:30
     section Strategy Actions
-    Fetch Tickers & Select OTM6    :crit, 08:31, 08:32
-    Execute Option Short Entries   :active, 08:32, 08:33
-    Monitor Premiums & Spot Price  :active, 08:33, 12:29
-    Session Target/Time Exit       :crit, 12:29, 12:30
+    Fetch Tickers & Select Strike  :crit, 09:48, 09:49
+    Execute Option Short Entries   :active, 09:49, 09:50
+    Monitor best_ask Premium       :active, 09:50, 16:29
+    Session Target/Time Exit       :crit, 16:29, 16:30
 ```
 
-*   **08:30 IST**: The Python bot daemon starts checking strategy states.
-*   **08:31 IST**: The entry job triggers. The bot pulls live options chains, parses OTM6 contracts, registers entries in the database, and sends short strangle orders to Delta Exchange India.
-*   **08:31 to 12:29 IST**: A high-frequency background loop runs **every 10 seconds** to poll option mark prices, check stop-losses (+40% limit), and verify if BTC spot moved by 0.75%.
-*   **12:29 IST**: Intraday session closes. The time-exit job triggers. The bot buys back any remaining open options contracts at market price, completing the cycle.
+*   **Daemon Bootup**: The Python bot daemon starts up, queries Supabase to fetch custom IST entry/exit times, and schedules cron execution triggers dynamically.
+*   **Strangle Entry (User Configured Time)**: The entry job triggers. The bot pulls live options chains, parses OTM strike contracts based on your active selection, registers entries in the database, and sends unbracketed short strangle orders to Delta Exchange India.
+*   **Intraday Monitoring Loop**: A high-frequency background loop runs **every 10 seconds** to poll option **`best_ask`** premium spreads, verify stop-losses locally, and monitor spot targets dynamically.
+*   **Scheduled Exit (User Configured Time)**: The time-exit job triggers. The bot buys back any remaining open options contracts at market price, completing the cycle.
 
 ---
 
