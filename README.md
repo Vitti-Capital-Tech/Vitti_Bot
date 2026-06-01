@@ -1,8 +1,6 @@
-# VITTI Bot: Options Terminal
 
-<p align="center">
-  <img src="dashboard/public/logo.jpeg" alt="VITTI Bot Logo" width="120" style="border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
-</p>
+
+# VITTI Bot: Options Terminal
 
 VITTI Bot is a professional, automated multi-account options execution engine and real-time dashboard designed for executing, monitoring, and managing strangle options strategies on Delta Exchange India. 
 
