@@ -54,7 +54,7 @@ def parse_options_chain(tickers: List[Dict[str, Any]], underlying: str = 'BTC') 
 
 def select_strangle_strikes(parsed_options: List[Dict[str, Any]], spot: float, strike_selection: str = 'otm6') -> Dict[str, Optional[Dict[str, Any]]]:
     """
-    Selects the specific option contracts based on strike selection logic (e.g. OTM6).
+    Selects the specific option contracts based on strike selection logic (e.g. OTM6) anchored to the ATM strike.
     """
     if not parsed_options:
         return {'C': None, 'P': None}
@@ -73,11 +73,19 @@ def select_strangle_strikes(parsed_options: List[Dict[str, Any]], spot: float, s
     calls = [opt for opt in today_options if opt['type'] == 'C']
     puts = [opt for opt in today_options if opt['type'] == 'P']
     
-    # Filter OTM strikes
-    # Calls: strike > spot, sorted ascending (cheaper premium further out)
-    otm_calls = sorted([c for c in calls if c['strike'] > spot], key=lambda x: x['strike'])
-    # Puts: strike < spot, sorted descending (cheaper premium further out)
-    otm_puts = sorted([p for p in puts if p['strike'] < spot], key=lambda x: x['strike'], reverse=True)
+    # Extract unique strikes to find the ATM strike
+    all_strikes = list(set(opt['strike'] for opt in today_options))
+    if not all_strikes:
+        return {'C': None, 'P': None}
+        
+    # ATM strike is the one closest to spot
+    atm_strike = min(all_strikes, key=lambda x: abs(x - spot))
+    
+    # Filter OTM strikes anchored to the ATM strike
+    # Calls: strike > atm_strike, sorted ascending (further out)
+    otm_calls = sorted([c for c in calls if c['strike'] > atm_strike], key=lambda x: x['strike'])
+    # Puts: strike < atm_strike, sorted descending (further out)
+    otm_puts = sorted([p for p in puts if p['strike'] < atm_strike], key=lambda x: x['strike'], reverse=True)
     
     selected_call = otm_calls[rank - 1] if len(otm_calls) >= rank else None
     selected_put = otm_puts[rank - 1] if len(otm_puts) >= rank else None
@@ -86,6 +94,7 @@ def select_strangle_strikes(parsed_options: List[Dict[str, Any]], spot: float, s
         'C': selected_call,
         'P': selected_put
     }
+
 
 def supabase_retry(query_func, retries=3, delay=2):
     """
@@ -151,6 +160,8 @@ def execute_decay1_entry(supabase: Client):
     sample_key = accounts[0]['api_key']
     sample_secret = accounts[0]['api_secret']
     sample_env = accounts[0]['env']
+    if sample_env == 'paper':
+        sample_env = 'production'
     
     ticker_client = DeltaClient(sample_key, sample_secret, sample_env)
     try:
@@ -181,24 +192,28 @@ def execute_decay1_entry(supabase: Client):
     # 3. Place entry orders across all accounts
     for acc in accounts:
         name = acc['name']
-        client = DeltaClient(acc['api_key'], acc['api_secret'], acc['env'])
+        is_paper = (acc['env'] == 'paper')
+        client_env = 'production' if is_paper else acc['env']
+        client = DeltaClient(acc['api_key'], acc['api_secret'], client_env)
         
-        log_trade_event(supabase, name, f"Starting Decay1 Execution. Spot: {spot}", 'INFO')
+        log_trade_event(supabase, name, f"Starting Decay1 {'Paper ' if is_paper else ''}Execution. Spot: {spot}", 'INFO')
         
-        # Pre-emptively clear all active and conditional bracket orders on this account to avoid bracket_order_position_exists blocks
-        try:
-            client.cancel_all_orders()
-            log_trade_event(supabase, name, "Pre-emptively cleared all active and conditional orders on exchange account.", 'INFO')
-        except Exception as cancel_err:
-            print(f"Notice: Failed to clear all orders on exchange for {name}: {cancel_err}")
+        # Pre-emptively clear all active and conditional bracket orders on this account (skip for paper)
+        if not is_paper:
+            try:
+                client.cancel_all_orders()
+                log_trade_event(supabase, name, "Pre-emptively cleared all active and conditional orders on exchange account.", 'INFO')
+            except Exception as cancel_err:
+                print(f"Notice: Failed to clear all orders on exchange for {name}: {cancel_err}")
             
         # Fetch current active positions from Delta Exchange to reconcile and close any existing open position
         # on the target option products before placing the new ones.
         exchange_positions = []
-        try:
-            exchange_positions = client.get_positions(underlying_asset_symbol=underlying)
-        except Exception as e:
-            print(f"Notice: Failed to fetch active positions for pre-entry cleanup: {e}")
+        if not is_paper:
+            try:
+                exchange_positions = client.get_positions(underlying_asset_symbol=underlying)
+            except Exception as e:
+                print(f"Notice: Failed to fetch active positions for pre-entry cleanup: {e}")
             
         # Sizing logic: for this simple deployment, we sell 1 contract (can be made configurable)
         size = 1 
@@ -208,8 +223,8 @@ def execute_decay1_entry(supabase: Client):
             symbol = contract['symbol']
             prod_id = contract['product_id']
             
-            # Reconcile and close any existing active position for this contract on the exchange first
-            if exchange_positions:
+            # Reconcile and close any existing active position for this contract on the exchange first (skip for paper)
+            if not is_paper and exchange_positions:
                 for ex_pos in exchange_positions:
                     ex_symbol = ex_pos.get('symbol') or ex_pos.get('product_symbol') or (ex_pos.get('product') and ex_pos['product'].get('symbol'))
                     ex_size = int(ex_pos.get('size', 0))
@@ -235,6 +250,7 @@ def execute_decay1_entry(supabase: Client):
                                 pass
                         except Exception as close_err:
                             log_trade_event(supabase, name, f"Failed to square off existing position for {symbol}: {close_err}", 'ERROR')
+            
             # Fetch current premium for the leg (use best_bid for short strangle entry)
             entry_premium = contract['best_bid'] if contract['best_bid'] > 0 else (contract['mark_price'] if contract['mark_price'] > 0 else 50.0)
             
@@ -249,91 +265,118 @@ def execute_decay1_entry(supabase: Client):
             else:
                 tp_spot = round(spot * (1 + tgt_pct), 2)
                 
-            try:
-                # Pre-emptively clear any stale resting orders/brackets on this product first to avoid bracket_order_position_exists error
+            if is_paper:
+                # Simulated paper execution
                 try:
-                    client.cancel_order(product_id=prod_id)
-                except Exception:
-                    pass
-                    
-                # Place Sell Order at market without native exchange bracket (monitored in python)
-                order = client.place_order(
-                    product_id=prod_id,
-                    size=size,
-                    side='sell',
-                    order_type='market_order',
-                    client_order_id=f"decay1_{leg.lower()}_{int(time.time())}"
-                )
-                
-                # Fetch actual fill price from average fill output if available, or fall back to estimated entry premium
-                fill_price = safe_float(order.get('avg_fill_price'))
-                if fill_price <= 0.0:
                     fill_price = entry_premium
-                
-                # Insert position details into Supabase
-                supabase.table('positions').insert({
-                    'account_id': acc['id'],
-                    'strategy_name': 'decay1',
-                    'symbol': symbol,
-                    'side': 'sell',
-                    'product_id': prod_id,
-                    'size': size,
-                    'entry_price': fill_price,
-                    'mark_price': fill_price,
-                    'sl_price': sl_price,
-                    'tp_price': tp_spot, # tp_price holds target SPOT price for code monitoring
-                    'pnl': 0.00,
-                    'status': 'open',
-                    'entry_order_id': order.get('id')
-                }).execute()
-                
-                log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Spot Target: {tp_spot}", 'TRADE')
-                
-            except Exception as e:
-                err_str = str(e)
-                if "market_disrupted_post_only_mode" in err_str:
-                    log_trade_event(supabase, name, f"Post-Only mode detected for {symbol}. Retrying with Limit Order at best ask...", 'INFO')
+                    
+                    # Insert position details into Supabase
+                    supabase.table('positions').insert({
+                        'account_id': acc['id'],
+                        'strategy_name': 'decay1',
+                        'symbol': symbol,
+                        'side': 'sell',
+                        'product_id': prod_id,
+                        'size': size,
+                        'entry_price': fill_price,
+                        'mark_price': fill_price,
+                        'sl_price': sl_price,
+                        'tp_price': tp_spot, # tp_price holds target SPOT price for code monitoring
+                        'pnl': 0.00,
+                        'status': 'open',
+                        'entry_order_id': 999999 # Simulated mock ID
+                    }).execute()
+                    
+                    log_trade_event(supabase, name, f"Placed Paper {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Spot Target: {tp_spot}", 'TRADE')
+                except Exception as e:
+                    log_trade_event(supabase, name, f"Failed to place Paper {leg} Short {symbol}: {e}", 'ERROR')
+            else:
+                # Real exchange execution
+                try:
+                    # Pre-emptively clear any stale resting orders/brackets on this product first to avoid bracket_order_position_exists error
                     try:
-                        # Fallback price: use best_ask for sell limit order (maker)
-                        best_ask = safe_float(contract.get('best_ask'), entry_premium)
-                        if best_ask <= 0.0:
-                            best_ask = entry_premium
+                        client.cancel_order(product_id=prod_id)
+                    except Exception:
+                        pass
+                        
+                    # Place Sell Order at market without native exchange bracket (monitored in python)
+                    order = client.place_order(
+                        product_id=prod_id,
+                        size=size,
+                        side='sell',
+                        order_type='market_order',
+                        client_order_id=f"decay1_{leg.lower()}_{int(time.time())}"
+                    )
+                    
+                    # Fetch actual fill price from average fill output if available, or fall back to estimated entry premium
+                    fill_price = safe_float(order.get('avg_fill_price'))
+                    if fill_price <= 0.0:
+                        fill_price = entry_premium
+                    
+                    # Insert position details into Supabase
+                    supabase.table('positions').insert({
+                        'account_id': acc['id'],
+                        'strategy_name': 'decay1',
+                        'symbol': symbol,
+                        'side': 'sell',
+                        'product_id': prod_id,
+                        'size': size,
+                        'entry_price': fill_price,
+                        'mark_price': fill_price,
+                        'sl_price': sl_price,
+                        'tp_price': tp_spot, # tp_price holds target SPOT price for code monitoring
+                        'pnl': 0.00,
+                        'status': 'open',
+                        'entry_order_id': order.get('id')
+                    }).execute()
+                    
+                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Spot Target: {tp_spot}", 'TRADE')
+                    
+                except Exception as e:
+                    err_str = str(e)
+                    if "market_disrupted_post_only_mode" in err_str:
+                        log_trade_event(supabase, name, f"Post-Only mode detected for {symbol}. Retrying with Limit Order at best ask...", 'INFO')
+                        try:
+                            # Fallback price: use best_ask for sell limit order (maker)
+                            best_ask = safe_float(contract.get('best_ask'), entry_premium)
+                            if best_ask <= 0.0:
+                                best_ask = entry_premium
+                                
+                            # Place limit order without native exchange bracket (monitored in python)
+                            order = client.place_order(
+                                product_id=prod_id,
+                                size=size,
+                                side='sell',
+                                order_type='limit_order',
+                                limit_price=str(best_ask),
+                                client_order_id=f"decay1_{leg.lower()}_lim_{int(time.time())}"
+                            )
                             
-                        # Place limit order without native exchange bracket (monitored in python)
-                        order = client.place_order(
-                            product_id=prod_id,
-                            size=size,
-                            side='sell',
-                            order_type='limit_order',
-                            limit_price=str(best_ask),
-                            client_order_id=f"decay1_{leg.lower()}_lim_{int(time.time())}"
-                        )
-                        
-                        # Fetch actual fill price or use limit best_ask
-                        fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
-                        
-                        # Insert position details into Supabase
-                        supabase.table('positions').insert({
-                            'account_id': acc['id'],
-                            'strategy_name': 'decay1',
-                            'symbol': symbol,
-                            'side': 'sell',
-                            'product_id': prod_id,
-                            'size': size,
-                            'entry_price': fill_price,
-                            'mark_price': fill_price,
-                            'sl_price': sl_price,
-                            'tp_price': tp_spot,
-                            'pnl': 0.00,
-                            'status': 'open',
-                            'entry_order_id': order.get('id')
-                        }).execute()
-                        
-                        log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Local): {sl_price}. Spot Target: {tp_spot}", 'TRADE')
-                    except Exception as limit_err:
-                        log_trade_event(supabase, name, f"Limit order fallback also failed for {symbol}: {limit_err}", 'ERROR')
-                else:
-                    log_trade_event(supabase, name, f"Failed to place {leg} Short {symbol}: {e}", 'ERROR')
+                            # Fetch actual fill price or use limit best_ask
+                            fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
+                            
+                            # Insert position details into Supabase
+                            supabase.table('positions').insert({
+                                'account_id': acc['id'],
+                                'strategy_name': 'decay1',
+                                'symbol': symbol,
+                                'side': 'sell',
+                                'product_id': prod_id,
+                                'size': size,
+                                'entry_price': fill_price,
+                                'mark_price': fill_price,
+                                'sl_price': sl_price,
+                                'tp_price': tp_spot,
+                                'pnl': 0.00,
+                                'status': 'open',
+                                'entry_order_id': order.get('id')
+                            }).execute()
+                            
+                            log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Local): {sl_price}. Spot Target: {tp_spot}", 'TRADE')
+                        except Exception as limit_err:
+                            log_trade_event(supabase, name, f"Limit order fallback also failed for {symbol}: {limit_err}", 'ERROR')
+                    else:
+                        log_trade_event(supabase, name, f"Failed to place {leg} Short {symbol}: {e}", 'ERROR')
 
 def execute_decay1_exit(supabase: Client):
     """
@@ -348,31 +391,41 @@ def execute_decay1_exit(supabase: Client):
         
     for pos in open_positions:
         acc = pos['accounts']
-        client = DeltaClient(acc['api_key'], acc['api_secret'], acc['env'])
+        is_paper = (acc['env'] == 'paper')
+        client_env = 'production' if is_paper else acc['env']
+        client = DeltaClient(acc['api_key'], acc['api_secret'], client_env)
         
         try:
-            # Place buy order at market to close the position
-            client.place_order(
-                product_id=pos['product_id'],
-                size=pos['size'],
-                side='buy',
-                order_type='market_order'
-            )
-            
-            # Cancel all resting orders/brackets to avoid false orders later
-            try:
-                client.cancel_all_orders(product_id=pos['product_id'])
-                log_trade_event(supabase, acc['name'], f"Time exit: Cleared resting brackets for {pos['symbol']}.", 'INFO', 'decay1')
-            except Exception as cancel_err:
-                print(f"Notice: Failed to cancel resting orders for time-exited leg {pos['symbol']}: {cancel_err}")
-            
-            # Update Supabase Status
-            supabase.table('positions').update({
-                'status': 'closed',
-                'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-            }).eq('id', pos['id']).execute()
-            
-            log_trade_event(supabase, acc['name'], f"Time exit triggered. Closed Short Strangle leg: {pos['symbol']}", 'TRADE', 'decay1')
+            if is_paper:
+                # Update Supabase Status directly for simulated close
+                supabase.table('positions').update({
+                    'status': 'closed',
+                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                }).eq('id', pos['id']).execute()
+                log_trade_event(supabase, acc['name'], f"Time exit triggered (Paper). Closed Short Strangle leg: {pos['symbol']}", 'TRADE', 'decay1')
+            else:
+                # Place buy order at market to close the position on real exchange
+                client.place_order(
+                    product_id=pos['product_id'],
+                    size=pos['size'],
+                    side='buy',
+                    order_type='market_order'
+                )
+                
+                # Cancel all resting orders/brackets to avoid false orders later
+                try:
+                    client.cancel_all_orders(product_id=pos['product_id'])
+                    log_trade_event(supabase, acc['name'], f"Time exit: Cleared resting brackets for {pos['symbol']}.", 'INFO', 'decay1')
+                except Exception as cancel_err:
+                    print(f"Notice: Failed to cancel resting orders for time-exited leg {pos['symbol']}: {cancel_err}")
+                
+                # Update Supabase Status
+                supabase.table('positions').update({
+                    'status': 'closed',
+                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                }).eq('id', pos['id']).execute()
+                
+                log_trade_event(supabase, acc['name'], f"Time exit triggered. Closed Short Strangle leg: {pos['symbol']}", 'TRADE', 'decay1')
         except Exception as e:
             log_trade_event(supabase, acc['name'], f"Failed to time-exit {pos['symbol']}: {e}", 'ERROR', 'decay1')
 
@@ -394,7 +447,8 @@ def monitor_positions_loop(supabase: Client):
                 
             # Fetch current underlying spot prices
             acc0 = open_positions[0]['accounts']
-            client = DeltaClient(acc0['api_key'], acc0['api_secret'], acc0['env'])
+            env0 = 'production' if acc0['env'] == 'paper' else acc0['env']
+            client = DeltaClient(acc0['api_key'], acc0['api_secret'], env0)
             tickers = client.get_tickers(contract_types='call_options,put_options', underlying='BTC')
             
             # Map ticker by symbol for easy lookup
@@ -411,7 +465,9 @@ def monitor_positions_loop(supabase: Client):
                 
             for acc_id, positions_list in accounts_positions.items():
                 acc = positions_list[0]['accounts']
-                trading_client = DeltaClient(acc['api_key'], acc['api_secret'], acc['env'])
+                is_paper = (acc['env'] == 'paper')
+                client_env = 'production' if is_paper else acc['env']
+                trading_client = DeltaClient(acc['api_key'], acc['api_secret'], client_env)
                 
                 # Get underlying asset symbol dynamically
                 underlying_symbol = 'BTC'
@@ -420,21 +476,22 @@ def monitor_positions_loop(supabase: Client):
                     if len(parts) >= 2:
                         underlying_symbol = parts[1]
                         
-                # Fetch current active positions from Delta Exchange
+                # Fetch current active positions from Delta Exchange (skip for paper)
                 exchange_positions = []
-                try:
-                    exchange_positions = trading_client.get_positions(underlying_asset_symbol=underlying_symbol)
-                except Exception as e:
-                    print(f"Error fetching active positions from exchange for {acc['name']}: {e}")
-                    exchange_positions = None
-                    
                 active_symbols = set()
-                if exchange_positions is not None:
-                    for ex_pos in exchange_positions:
-                        ex_symbol = ex_pos.get('symbol') or ex_pos.get('product_symbol') or (ex_pos.get('product') and ex_pos['product'].get('symbol'))
-                        ex_size = abs(int(ex_pos.get('size', 0)))
-                        if ex_symbol and ex_size > 0:
-                            active_symbols.add(ex_symbol)
+                if not is_paper:
+                    try:
+                        exchange_positions = trading_client.get_positions(underlying_asset_symbol=underlying_symbol)
+                    except Exception as e:
+                        print(f"Error fetching active positions from exchange for {acc['name']}: {e}")
+                        exchange_positions = None
+                        
+                    if exchange_positions is not None:
+                        for ex_pos in exchange_positions:
+                            ex_symbol = ex_pos.get('symbol') or ex_pos.get('product_symbol') or (ex_pos.get('product') and ex_pos['product'].get('symbol'))
+                            ex_size = abs(int(ex_pos.get('size', 0)))
+                            if ex_symbol and ex_size > 0:
+                                active_symbols.add(ex_symbol)
                             
                 for pos in positions_list:
                     symbol = pos['symbol']
@@ -462,8 +519,8 @@ def monitor_positions_loop(supabase: Client):
                             'pnl': round(unrealized_pnl, 6)
                         }).eq('id', pos['id']).execute()
                     
-                    # 2. Reconcile if position was manually closed on Delta Exchange directly
-                    if status == 'open' and exchange_positions is not None and symbol not in active_symbols:
+                    # 2. Reconcile if position was manually closed on Delta Exchange directly (skip for paper)
+                    if not is_paper and status == 'open' and exchange_positions is not None and symbol not in active_symbols:
                         print(f"Reconciliation: option {symbol} is closed on Delta Exchange. Updating DB status.")
                         try:
                             supabase.table('positions').update({
@@ -492,31 +549,41 @@ def monitor_positions_loop(supabase: Client):
                         else:
                             reason = f"Spot Target Hit ({spot})"
                             
-                        log_trade_event(supabase, acc['name'], f"{reason}. Closing leg {symbol} on exchange...", 'TRADE', 'decay1')
+                        log_trade_event(supabase, acc['name'], f"{reason}. Closing leg {symbol} {'(Paper)' if is_paper else 'on exchange'}...", 'TRADE', 'decay1')
                         
-                        try:
-                            trading_client.place_order(
-                                product_id=prod_id,
-                                size=size,
-                                side='buy',
-                                order_type='market_order'
-                            )
-                            
-                            # Cancel all resting orders/brackets to avoid false orders later
+                        if is_paper:
                             try:
-                                trading_client.cancel_all_orders(product_id=prod_id)
-                                log_trade_event(supabase, acc['name'], f"Decay1: Cancelled all resting brackets/orders for {symbol}.", 'INFO', 'decay1')
-                            except Exception as cancel_err:
-                                print(f"Notice: Failed to cancel resting orders for {symbol}: {cancel_err}")
-                            
-                            supabase.table('positions').update({
-                                'status': 'closed',
-                                'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                            }).eq('id', pos['id']).execute()
-                            
-                            log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} on exchange.", 'TRADE', 'decay1')
-                        except Exception as e:
-                            log_trade_event(supabase, acc['name'], f"Failed to execute close for {symbol}: {e}", 'ERROR', 'decay1')
+                                supabase.table('positions').update({
+                                    'status': 'closed',
+                                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                                }).eq('id', pos['id']).execute()
+                                log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} (Paper).", 'TRADE', 'decay1')
+                            except Exception as e:
+                                log_trade_event(supabase, acc['name'], f"Failed to execute paper close for {symbol}: {e}", 'ERROR', 'decay1')
+                        else:
+                            try:
+                                trading_client.place_order(
+                                    product_id=prod_id,
+                                    size=size,
+                                    side='buy',
+                                    order_type='market_order'
+                                )
+                                
+                                # Cancel all resting orders/brackets to avoid false orders later
+                                try:
+                                    trading_client.cancel_all_orders(product_id=prod_id)
+                                    log_trade_event(supabase, acc['name'], f"Decay1: Cancelled all resting brackets/orders for {symbol}.", 'INFO', 'decay1')
+                                except Exception as cancel_err:
+                                    print(f"Notice: Failed to cancel resting orders for {symbol}: {cancel_err}")
+                                
+                                supabase.table('positions').update({
+                                    'status': 'closed',
+                                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                                }).eq('id', pos['id']).execute()
+                                
+                                log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} on exchange.", 'TRADE', 'decay1')
+                            except Exception as e:
+                                log_trade_event(supabase, acc['name'], f"Failed to execute close for {symbol}: {e}", 'ERROR', 'decay1')
                             
         except Exception as e:
             err_msg = str(e)

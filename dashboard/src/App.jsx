@@ -676,10 +676,10 @@ export default function App() {
             }`}>
                 {positions.length === 0 ? (
                   /* INSTITUTIONAL STANDBY WORKSPACE */
-                  <div className="flex flex-col lg:flex-row gap-8 items-center lg:items-stretch py-8">
+                  <div className="flex flex-col gap-8 items-center py-8">
                     
                     {/* Standby Banner */}
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl bg-white/[0.01] border border-white/5">
+                    <div className="w-full max-w-2xl flex flex-col items-center justify-center text-center p-12 rounded-2xl bg-white/[0.01] border border-white/5">
                       <div className="w-16 h-16 rounded-full bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-center text-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.05)] mb-4 animate-pulse">
                         <CheckCircle2 className="w-8 h-8" />
                       </div>
@@ -697,53 +697,6 @@ export default function App() {
                         >
                           Manual Polling Sync
                         </button>
-                      </div>
-                    </div>
-
-                    {/* Decay1 Strategy Mechanics Blueprint */}
-                    <div className="w-full lg:w-[420px] glass-card rounded-2xl p-6 flex flex-col justify-between border border-white/5">
-                      <div>
-                        <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                          <BookOpen className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-300 font-mono">Strategy Specifications</h4>
-                        </div>
-                        
-                        <div className="mt-4 flex flex-col gap-3 text-xs text-gray-400">
-                          <div className="flex justify-between items-center py-1.5 border-b border-white/[0.02]">
-                            <span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5 text-gray-500" /> Contract Strike Selection</span>
-                            <span className="font-mono font-bold text-white uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded text-[10px]">
-                              OTM6 (Delta ~0.07)
-                            </span>
-                          </div>
-                          
-                          <div className="flex justify-between items-center py-1.5 border-b border-white/[0.02]">
-                            <span className="flex items-center gap-1.5"><TrendingDown className="w-3.5 h-3.5 text-gray-500" /> Leg-wise Hard Stop Loss</span>
-                            <span className="font-mono font-bold text-white bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[10px]">
-                              +40.0% (1.40x Entry)
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center py-1.5 border-b border-white/[0.02]">
-                            <span className="flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 text-gray-500" /> Spot target exit</span>
-                            <span className="font-mono font-bold text-white bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px]">
-                              0.75% Spot Move (Exit Both)
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center py-1.5">
-                            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-gray-500" /> Active Session Duration</span>
-                            <span className="font-mono font-bold text-white text-[10px]">
-                              08:31 IST to 12:29 IST
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 bg-[#0b0f19]/80 p-3.5 rounded-xl border border-white/5 flex gap-3 items-start">
-                        <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
-                        <p className="text-[10px] text-gray-500 leading-relaxed">
-                          Intraday option decay relies on selling options when volatility cools. The bot constantly monitors price every 10 seconds.
-                        </p>
                       </div>
                     </div>
 
