@@ -27,7 +27,8 @@ import {
   Sun,
   Moon,
   Pause,
-  Play
+  Play,
+  History
 } from 'lucide-react'
 
 export default function App() {
@@ -38,6 +39,8 @@ export default function App() {
   const [selectedConfigStrategy, setSelectedConfigStrategy] = useState('decay1')
   const [positions, setPositions] = useState([])
   const [logs, setLogs] = useState([])
+  const [historyPositions, setHistoryPositions] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   
   const [toasts, setToasts] = useState([])
   const [lastLogId, setLastLogId] = useState(null)
@@ -160,6 +163,30 @@ export default function App() {
     }
     fetchData()
   }, [refreshTrigger, lastLogId])
+
+  // Fetch closed positions history when activeTab is history
+  useEffect(() => {
+    async function fetchHistory() {
+      if (activeTab !== 'history') return
+      // Only trigger visual spinner on initial page load
+      if (historyPositions.length === 0) {
+        setHistoryLoading(true)
+      }
+      try {
+        const { data, error } = await supabase
+          .from('positions')
+          .select('*, accounts(name, env)')
+          .eq('status', 'closed')
+          .order('closed_at', { ascending: false })
+        if (data) setHistoryPositions(data)
+      } catch (err) {
+        console.error("Error fetching trade history:", err)
+      } finally {
+        setHistoryLoading(false)
+      }
+    }
+    fetchHistory()
+  }, [activeTab, refreshTrigger])
 
   // Synchronize selected strategy config when selectedConfigStrategy or strategiesList changes
   useEffect(() => {
@@ -464,6 +491,99 @@ export default function App() {
     return differenceInMinutes < 10 // Healthy if a log event happened in last 10 mins (including bot heartbeats)
   }
 
+  const formatDateTime = (isoString) => {
+    if (!isoString) return 'NA'
+    return new Date(isoString).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  }
+
+  const getGroupedHistory = () => {
+    const dateGroups = {}
+    historyPositions.forEach(pos => {
+      if (!pos.closed_at) return
+      const dateStr = new Date(pos.closed_at).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      }).toUpperCase()
+      
+      if (!dateGroups[dateStr]) {
+        dateGroups[dateStr] = []
+      }
+      dateGroups[dateStr].push(pos)
+    })
+    
+    return Object.keys(dateGroups).map(dateStr => {
+      const datePosList = dateGroups[dateStr]
+      const strangleGroups = {}
+      
+      datePosList.forEach(pos => {
+        const key = `${pos.account_id}_${pos.strategy_name}`
+        if (!strangleGroups[key]) {
+          strangleGroups[key] = []
+        }
+        strangleGroups[key].push(pos)
+      })
+      
+      const strangles = Object.keys(strangleGroups).map(groupKey => {
+        const [accId, strategyName] = groupKey.split('_')
+        const accPosList = strangleGroups[groupKey]
+        
+        const accName = accPosList[0].accounts?.name || 'Linked Account'
+        const accEnv = accPosList[0].accounts?.env || 'production'
+        
+        const calls = accPosList.filter(p => p.symbol.startsWith('C-'))
+        const puts = accPosList.filter(p => p.symbol.startsWith('P-'))
+        
+        const stranglePairs = []
+        const unpaired = []
+        const usedPuts = new Set()
+        
+        calls.forEach(c => {
+          const cParsed = parseOptionSymbol(c.symbol)
+          const matchingPut = puts.find(p => {
+            if (usedPuts.has(p.id)) return false
+            const pParsed = parseOptionSymbol(p.symbol)
+            return pParsed.expiry === cParsed.expiry
+          })
+          
+          if (matchingPut) {
+            stranglePairs.push({ call: c, put: matchingPut })
+            usedPuts.add(matchingPut.id)
+          } else {
+            unpaired.push(c)
+          }
+        })
+        
+        puts.forEach(p => {
+          if (!usedPuts.has(p.id)) {
+            unpaired.push(p)
+          }
+        })
+        
+        return {
+          accountId: accId,
+          accountName: accName,
+          env: accEnv,
+          strategyName,
+          stranglePairs,
+          unpaired
+        }
+      })
+      
+      return {
+        dateStr,
+        strangles
+      }
+    })
+  }
+
   return (
     <div className="min-h-screen bg-[#05070e] text-gray-200 flex flex-col font-sans relative overflow-hidden pb-16">
       
@@ -498,6 +618,7 @@ export default function App() {
           <div className="flex items-center gap-0.5 bg-[#090d16]/80 border border-white/5 p-1 rounded-xl w-full md:w-auto overflow-x-auto scrollbar-none shadow-inner">
             {[
               { id: 'positions', label: 'Live Positions', icon: Activity },
+              { id: 'history', label: 'Trade History', icon: History },
               { id: 'accounts', label: 'Trading Accounts', icon: UserPlus },
               { id: 'config', label: 'Configure Strategies', icon: Sliders }
             ].map(tab => {
@@ -1010,6 +1131,202 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+            {/* TRADE HISTORY */}
+            <div className={`transition-all duration-350 ease-in-out transform flex flex-col gap-8 w-full max-w-7xl ${
+              activeTab === 'history' 
+              ? 'visible opacity-100 translate-y-0 scale-100 pointer-events-auto relative z-10' 
+              : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-0 top-0 z-0'
+            }`}>
+              
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center border-b border-white/[0.04] pb-4.5 gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-white tracking-wide">Completed Trade Records</h3>
+                  <div className="tooltip-trigger">
+                    <Info className="w-3.5 h-3.5 text-gray-500 hover:text-indigo-400 cursor-help transition-colors" />
+                    <span className="tooltip-content">
+                      Historical log of closed short strangle positions grouped by date and strategy.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {historyLoading ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin mb-3" />
+                  <p className="text-xs text-gray-500">Retrieving closed trade records...</p>
+                </div>
+              ) : historyPositions.length === 0 ? (
+                <div className="text-center py-20 border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
+                  <History className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <h4 className="text-sm font-bold text-gray-400">No completed trades found</h4>
+                  <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                    Once options strangles are closed via time exit, stop loss, or manual square-off, they will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-10">
+                  {getGroupedHistory().map(dateGroup => (
+                    <div key={dateGroup.dateStr} className="flex flex-col gap-4">
+                      {/* Date Heading Ribbon */}
+                      <div className="flex items-center gap-4">
+                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-cyan-400 bg-cyan-950/30 border border-cyan-800/30 px-3 py-1 rounded-md font-mono select-none">
+                          {dateGroup.dateStr}
+                        </span>
+                        <div className="h-px bg-white/5 flex-1" />
+                      </div>
+
+                      {/* Strangles executed on this date */}
+                      <div className="flex flex-col gap-6">
+                        {dateGroup.strangles.map(group => {
+                          const allGroupPositions = [...group.stranglePairs.flatMap(p => [p.call, p.put]), ...group.unpaired]
+                          const totalGroupPnL = allGroupPositions.reduce((acc, pos) => acc + (parseFloat(pos.pnl) || 0.0), 0.0)
+
+                          return (
+                            <div key={`${group.accountId}_${group.strategyName}`} className="glass-card rounded-2xl border border-white/5 bg-[#0d1222]/20 p-5 flex flex-col gap-5 shadow-lg relative overflow-hidden">
+                              {/* Group Header */}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-3 gap-3">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0" />
+                                  <div>
+                                    <h4 className="font-extrabold text-white text-sm tracking-tight">{group.accountName}</h4>
+                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                      <span className={`text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded ${
+                                        group.env === 'production' 
+                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                        : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.05)]'
+                                      }`}>
+                                        {group.env === 'production' ? 'PROD - REAL FUNDS' : group.env === 'paper' ? 'LIVE PAPER' : 'SANDBOX TESTNET'}
+                                      </span>
+                                      <span className="text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                        STRATEGY: {(group.strategyName || 'decay1').toUpperCase()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Group PnL */}
+                                <div className="text-right self-end sm:self-auto">
+                                  <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider font-sans">Strangle Yield</p>
+                                  <span className={`font-mono text-xs font-black ${totalGroupPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {totalGroupPnL >= 0 ? '+' : ''}{totalGroupPnL.toFixed(4)} USDT
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Strangle Legs */}
+                              <div className="flex flex-col gap-4">
+                                {group.stranglePairs.map((pair, idx) => {
+                                  const callEntry = parseFloat(pair.call.entry_price) || 0
+                                  const putEntry = parseFloat(pair.put.entry_price) || 0
+                                  const callExit = parseFloat(pair.call.mark_price) || 0
+                                  const putExit = parseFloat(pair.put.mark_price) || 0
+                                  
+                                  const callPnL = parseFloat(pair.call.pnl) || 0
+                                  const putPnL = parseFloat(pair.put.pnl) || 0
+                                  
+                                  return (
+                                    <div key={idx} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                      {[
+                                        { leg: pair.call, entry: callEntry, exit: callExit, pnl: callPnL, isCall: true },
+                                        { leg: pair.put, entry: putEntry, exit: putExit, pnl: putPnL, isCall: false }
+                                      ].map((l, lIdx) => (
+                                        <div key={lIdx} className="bg-black/10 p-4 rounded-xl border border-white/[0.02] flex flex-col gap-2 relative">
+                                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-extrabold text-white text-xs font-mono">{l.leg.symbol}</span>
+                                              <span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-widest border ${
+                                                l.isCall 
+                                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                                : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                                              }`}>
+                                                {l.isCall ? 'CALL SHORT' : 'PUT SHORT'}
+                                              </span>
+                                            </div>
+                                            <span className={`font-mono text-xs font-bold ${l.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                              {l.pnl >= 0 ? '+' : ''}{l.pnl.toFixed(4)} USDT
+                                            </span>
+                                          </div>
+
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-1 text-[9px] font-mono text-gray-400">
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Entry</span>
+                                              <span className="text-gray-300 font-bold mt-0.5">${l.entry.toFixed(2)}</span>
+                                              <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(l.leg.created_at)}</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                              <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Exit</span>
+                                              <span className="text-gray-300 font-bold mt-0.5">${l.exit.toFixed(2)}</span>
+                                              <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(l.leg.closed_at)}</span>
+                                            </div>
+                                            <div className="flex flex-col col-span-2 sm:col-span-1">
+                                              <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Risk / Limits</span>
+                                              <span className="text-rose-400 font-semibold mt-0.5">SL: ${parseFloat(l.leg.sl_price || 0).toFixed(2)}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
+
+                                {group.unpaired.map((leg, idx) => {
+                                  const isCall = leg.symbol.startsWith('C-')
+                                  const entryPrice = parseFloat(leg.entry_price) || 0
+                                  const exitPrice = parseFloat(leg.mark_price) || 0
+                                  const legPnL = parseFloat(leg.pnl) || 0
+
+                                  return (
+                                    <div key={idx} className="bg-black/10 p-4 rounded-xl border border-white/[0.02] flex flex-col gap-2 relative">
+                                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-extrabold text-white text-xs font-mono">{leg.symbol}</span>
+                                          <span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-widest border ${
+                                            isCall 
+                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                            : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                                          }`}>
+                                            {isCall ? 'CALL SHORT' : 'PUT SHORT'}
+                                          </span>
+                                          <span className="px-1.5 py-0.5 rounded text-[7px] font-bold uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                            UNPAIRED
+                                          </span>
+                                        </div>
+                                        <span className={`font-mono text-xs font-bold ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                          {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
+                                        </span>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-1 text-[9px] font-mono text-gray-400">
+                                        <div className="flex flex-col">
+                                          <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Entry</span>
+                                          <span className="text-gray-300 font-bold mt-0.5">${entryPrice.toFixed(2)}</span>
+                                          <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(leg.created_at)}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Exit</span>
+                                          <span className="text-gray-300 font-bold mt-0.5">${exitPrice.toFixed(2)}</span>
+                                          <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(leg.closed_at)}</span>
+                                        </div>
+                                        <div className="flex flex-col col-span-2 sm:col-span-1">
+                                          <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Risk / Limits</span>
+                                          <span className="text-rose-400 font-semibold mt-0.5">SL: ${parseFloat(leg.sl_price || 0).toFixed(2)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+            </div>
 
             {/* TRADING ACCOUNTS */}
             <div className={`transition-all duration-350 ease-in-out transform flex flex-col gap-6 ${
