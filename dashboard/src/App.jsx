@@ -1262,6 +1262,14 @@ export default function App() {
                                             <div className="flex flex-col col-span-2 sm:col-span-1">
                                               <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Risk / Limits</span>
                                               <span className="text-rose-400 font-semibold mt-0.5">SL: ${parseFloat(l.leg.sl_price || 0).toFixed(2)}</span>
+                                              <span className="text-emerald-400 font-semibold mt-0.5">
+                                                {l.leg.strategy_name === 'decay2' ? `TP: $${parseFloat(l.leg.tp_price || 0).toFixed(2)}` : `Spot Target: $${parseFloat(l.leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                                              </span>
+                                              {l.leg.strategy_name === 'decay1' && l.leg.tp_price > 0 && (
+                                                <span className="text-cyan-400 font-semibold mt-0.5">
+                                                  Entry Spot: ${(l.isCall ? l.leg.tp_price / 0.9925 : l.leg.tp_price / 1.0075).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                                </span>
+                                              )}
                                             </div>
                                           </div>
                                         </div>
@@ -1311,6 +1319,14 @@ export default function App() {
                                         <div className="flex flex-col col-span-2 sm:col-span-1">
                                           <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Risk / Limits</span>
                                           <span className="text-rose-400 font-semibold mt-0.5">SL: ${parseFloat(leg.sl_price || 0).toFixed(2)}</span>
+                                          <span className="text-emerald-400 font-semibold mt-0.5">
+                                            {leg.strategy_name === 'decay2' ? `TP: $${parseFloat(leg.tp_price || 0).toFixed(2)}` : `Spot Target: $${parseFloat(leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                                          </span>
+                                          {leg.strategy_name === 'decay1' && leg.tp_price > 0 && (
+                                            <span className="text-cyan-400 font-semibold mt-0.5">
+                                              Entry Spot: ${(isCall ? leg.tp_price / 0.9925 : leg.tp_price / 1.0075).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
