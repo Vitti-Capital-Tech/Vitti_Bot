@@ -123,8 +123,14 @@ export default function App() {
           if (activeStrat) setStrategy(activeStrat)
         }
         
-        // 3. Fetch Open Positions
-        const pos = await supabase.from('positions').select('*').eq('status', 'open').order('created_at', { ascending: false })
+        // 3. Fetch Positions (Open or Closed Today)
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+        const pos = await supabase
+          .from('positions')
+          .select('*')
+          .or(`status.eq.open,and(status.eq.closed,created_at.gte.${todayStart.toISOString()})`)
+          .order('created_at', { ascending: false })
         if (pos.data) setPositions(pos.data)
         
         // 4. Fetch Logs
@@ -742,13 +748,19 @@ export default function App() {
                             
                             {/* Strangle Double Exit Panel */}
                             <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                              <button
-                                onClick={() => triggerStrangleClose(allGroupPositions, group.accountName)}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 hover:border-rose-600 hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300 transform active:scale-95 cursor-pointer shrink-0"
-                              >
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                                <span>{isSingleLeg ? "Square Off Remaining Leg" : "Square Off Strangle (Both Legs)"}</span>
-                              </button>
+                              {allGroupPositions.some(p => p.status === 'open') ? (
+                                <button
+                                  onClick={() => triggerStrangleClose(allGroupPositions, group.accountName)}
+                                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 hover:border-rose-600 hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] text-[10px] font-extrabold uppercase tracking-wider transition-all duration-300 transform active:scale-95 cursor-pointer shrink-0"
+                                >
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  <span>{isSingleLeg ? "Square Off Remaining Leg" : "Square Off Strangle (Both Legs)"}</span>
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-1.5 bg-gray-500/10 text-gray-500 border border-gray-500/20 px-4 py-2.5 rounded-xl text-[10px] font-extrabold uppercase tracking-wider shrink-0 select-none">
+                                  <span>Strangle Squared Off</span>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -842,12 +854,18 @@ export default function App() {
                                             <span className={`font-mono text-xs font-bold shrink-0 ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                               {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
                                             </span>
-                                            <button
-                                              onClick={() => triggerLegClose(leg.id, leg.symbol)}
-                                              className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all text-[8px] font-bold uppercase tracking-wider shrink-0 cursor-pointer active:scale-95"
-                                            >
-                                              Exit Leg
-                                            </button>
+                                            {leg.status === 'closed' ? (
+                                              <span className="px-2.5 py-1.5 rounded-lg bg-gray-500/10 text-gray-500 border border-gray-500/20 text-[8px] font-extrabold uppercase tracking-wider shrink-0 select-none">
+                                                Closed
+                                              </span>
+                                            ) : (
+                                              <button
+                                                onClick={() => triggerLegClose(leg.id, leg.symbol)}
+                                                className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all text-[8px] font-bold uppercase tracking-wider shrink-0 cursor-pointer active:scale-95"
+                                              >
+                                                Exit Leg
+                                              </button>
+                                            )}
                                           </div>
                                         </div>
 
@@ -937,12 +955,18 @@ export default function App() {
                                           <span className={`font-mono text-xs font-bold shrink-0 ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                             {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
                                           </span>
-                                          <button
-                                            onClick={() => triggerLegClose(leg.id, leg.symbol)}
-                                            className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all text-[8px] font-bold uppercase tracking-wider shrink-0 cursor-pointer active:scale-95"
-                                          >
-                                            Square Off
-                                          </button>
+                                          {leg.status === 'closed' ? (
+                                            <span className="px-2.5 py-1.5 rounded-lg bg-gray-500/10 text-gray-500 border border-gray-500/20 text-[8px] font-extrabold uppercase tracking-wider shrink-0 select-none">
+                                              Closed
+                                            </span>
+                                          ) : (
+                                            <button
+                                              onClick={() => triggerLegClose(leg.id, leg.symbol)}
+                                              className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 transition-all text-[8px] font-bold uppercase tracking-wider shrink-0 cursor-pointer active:scale-95"
+                                            >
+                                              Square Off
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
 
