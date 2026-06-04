@@ -9,7 +9,8 @@ from strategy_decay1 import (
     parse_options_chain,
     select_strangle_strikes,
     log_trade_event,
-    supabase_retry
+    supabase_retry,
+    get_contract_multiplier
 )
 
 def execute_decay2_entry(supabase: Client):
@@ -440,7 +441,8 @@ def monitor_positions_loop_decay2(supabase: Client):
                             quotes = ticker.get('quotes', {})
                             best_ask = safe_float(quotes.get('best_ask')) if quotes else 0.0
                             ask_price = best_ask if best_ask > 0 else safe_float(ticker.get('mark_price'), entry_price)
-                            unrealized_pnl = (entry_price - ask_price) * size
+                            multiplier = get_contract_multiplier(symbol)
+                            unrealized_pnl = (entry_price - ask_price) * size * multiplier
                             
                             try:
                                 supabase.table('positions').update({

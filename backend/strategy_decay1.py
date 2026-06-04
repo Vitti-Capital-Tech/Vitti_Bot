@@ -17,6 +17,22 @@ def safe_float(val: Any, default: float = 0.0) -> float:
     except (ValueError, TypeError):
         return default
 
+def get_contract_multiplier(symbol: str) -> float:
+    """
+    Returns the contract size multiplier for a Delta option symbol.
+    For BTC options: 0.001
+    For ETH options: 0.01
+    Default: 1.0
+    """
+    parts = symbol.split('-')
+    if len(parts) >= 2:
+        underlying = parts[1].upper()
+        if underlying == 'BTC':
+            return 0.001
+        elif underlying == 'ETH':
+            return 0.01
+    return 1.0
+
 def parse_options_chain(tickers: List[Dict[str, Any]], underlying: str = 'BTC') -> List[Dict[str, Any]]:
     """
     Parses public tickers to extract structured option contract details.
@@ -511,7 +527,8 @@ def monitor_positions_loop(supabase: Client):
                         quotes = ticker.get('quotes', {})
                         best_ask = safe_float(quotes.get('best_ask')) if quotes else 0.0
                         ask_price = best_ask if best_ask > 0 else safe_float(ticker.get('mark_price'), entry_price)
-                        unrealized_pnl = (entry_price - ask_price) * size
+                        multiplier = get_contract_multiplier(symbol)
+                        unrealized_pnl = (entry_price - ask_price) * size * multiplier
                         print(f"[MONITOR DEBUG] {symbol} | Entry: {entry_price} | Ask: {ask_price} | PnL: {unrealized_pnl:.4f} USDT | SL: {sl_price}")
                         
                         supabase.table('positions').update({
