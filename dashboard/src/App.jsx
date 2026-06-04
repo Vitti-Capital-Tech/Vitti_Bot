@@ -87,6 +87,20 @@ export default function App() {
   const toggleTheme = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark')
   }
+
+  const [currency, setCurrency] = useState(() => {
+    return localStorage.getItem('vitti_currency') || 'USD'
+  })
+
+  // Format currency value based on USD / INR toggle
+  const formatAmount = (val, decimals = 4) => {
+    const numericVal = parseFloat(val) || 0.0
+    if (currency === 'INR') {
+      const inrVal = numericVal * 85
+      return `₹${inrVal.toFixed(decimals === 4 ? 2 : decimals)}`
+    }
+    return `$${numericVal.toFixed(decimals)}`
+  }
   
   // Add Account form states
   const [accName, setAccName] = useState('')
@@ -643,6 +657,17 @@ export default function App() {
           {/* RIGHT — Controls */}
           <div className="flex items-center gap-2 w-full md:w-auto justify-end">
             <button
+              onClick={() => {
+                const nextCurrency = currency === 'USD' ? 'INR' : 'USD'
+                setCurrency(nextCurrency)
+                localStorage.setItem('vitti_currency', nextCurrency)
+              }}
+              className="px-3.5 py-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 transition-all duration-200 text-[10px] font-black tracking-widest text-cyan-400 font-sans uppercase flex items-center gap-1.5 focus:outline-none"
+              title={`Switch display to ${currency === 'USD' ? 'INR' : 'USD'}`}
+            >
+              <span>{currency === 'USD' ? '$ USD' : '₹ INR'}</span>
+            </button>
+            <button
               onClick={toggleTheme}
               className="p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 hover:border-white/10 transition-all duration-200"
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
@@ -707,8 +732,7 @@ export default function App() {
               ? 'text-emerald-400 drop-shadow-[0_0_18px_rgba(16,185,129,0.25)]'
               : 'text-rose-400 drop-shadow-[0_0_18px_rgba(244,63,94,0.25)]'
             }`}>
-              {totalPnL >= 0 ? '+' : ''}{totalPnL.toFixed(4)}
-              <span className="text-sm font-semibold text-gray-500 ml-1.5">USDT</span>
+              {totalPnL >= 0 ? '+' : ''}{formatAmount(totalPnL, 4)}
             </h3>
           </div>
 
@@ -911,17 +935,17 @@ export default function App() {
                                 <div className="bg-[#080b13]/80 rounded-xl border border-white/5 divide-y divide-white/5 md:divide-y-0 md:divide-x md:grid md:grid-cols-4 text-xs font-mono">
                                   <div className="p-4 flex flex-col justify-center">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Strangle Entry Value</p>
-                                    <p className="text-sm md:text-base font-black text-white mt-1 font-mono">{entrySum.toFixed(4)} USDT</p>
+                                    <p className="text-sm md:text-base font-black text-white mt-1 font-mono">{formatAmount(entrySum, 4)}</p>
                                   </div>
                                   <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Strangle Current Mark</p>
-                                    <p className="text-sm md:text-base font-black text-gray-400 mt-1 font-mono">{markSum.toFixed(4)} USDT</p>
+                                    <p className="text-sm md:text-base font-black text-gray-400 mt-1 font-mono">{formatAmount(markSum, 4)}</p>
                                   </div>
                                   <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Strangle Pair PnL</p>
                                     <div className="flex flex-wrap items-baseline gap-2 mt-1 font-mono">
                                       <span className={`text-sm md:text-base font-black ${pairPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                        {pairPnL >= 0 ? '+' : ''}{pairPnL.toFixed(4)} USDT
+                                        {pairPnL >= 0 ? '+' : ''}{formatAmount(pairPnL, 4)}
                                       </span>
                                       <span className={`text-[10px] font-extrabold ${decayPct >= 0 ? 'text-emerald-400/80' : 'text-rose-400/80'}`}>
                                         ({decayPct >= 0 ? '+' : ''}{decayPct.toFixed(1)}%)
@@ -931,7 +955,7 @@ export default function App() {
                                   <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Account Balance</p>
                                     <p className="text-sm md:text-base font-black text-white mt-1 font-mono">
-                                      {(10000 + pairPnL).toFixed(2)} USDT
+                                      {formatAmount(10000 + pairPnL, 2)}
                                     </p>
                                   </div>
                                 </div>
@@ -973,7 +997,7 @@ export default function App() {
                                           
                                           <div className="flex items-center gap-3">
                                             <span className={`font-mono text-xs font-bold shrink-0 ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                              {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
+                                              {legPnL >= 0 ? '+' : ''}{formatAmount(legPnL, 4)}
                                             </span>
                                             {leg.status === 'closed' ? (
                                               <span className="px-2.5 py-1.5 rounded-lg bg-gray-500/10 text-gray-500 border border-gray-500/20 text-[8px] font-extrabold uppercase tracking-wider shrink-0 select-none">
@@ -1074,7 +1098,7 @@ export default function App() {
                                         
                                         <div className="flex items-center gap-3">
                                           <span className={`font-mono text-xs font-bold shrink-0 ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                            {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
+                                            {legPnL >= 0 ? '+' : ''}{formatAmount(legPnL, 4)}
                                           </span>
                                           {leg.status === 'closed' ? (
                                             <span className="px-2.5 py-1.5 rounded-lg bg-gray-500/10 text-gray-500 border border-gray-500/20 text-[8px] font-extrabold uppercase tracking-wider shrink-0 select-none">
@@ -1114,7 +1138,7 @@ export default function App() {
                                         </div>
                                         <div className="flex flex-col">
                                           <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Account Balance</span>
-                                          <span className="text-white text-xs mt-1 font-bold font-mono">{(10000 + legPnL).toFixed(2)} USDT</span>
+                                          <span className="text-white text-xs mt-1 font-bold font-mono">{formatAmount(10000 + legPnL, 2)}</span>
                                         </div>
                                       </div>
                                     </div>
@@ -1209,7 +1233,7 @@ export default function App() {
                                 <div className="text-right self-end sm:self-auto">
                                   <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider font-sans">Strangle Yield</p>
                                   <span className={`font-mono text-xs font-black ${totalGroupPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                    {totalGroupPnL >= 0 ? '+' : ''}{totalGroupPnL.toFixed(4)} USDT
+                                    {totalGroupPnL >= 0 ? '+' : ''}{formatAmount(totalGroupPnL, 4)}
                                   </span>
                                 </div>
                               </div>
@@ -1244,7 +1268,7 @@ export default function App() {
                                               </span>
                                             </div>
                                             <span className={`font-mono text-xs font-bold ${l.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                              {l.pnl >= 0 ? '+' : ''}{l.pnl.toFixed(4)} USDT
+                                              {l.pnl >= 0 ? '+' : ''}{formatAmount(l.pnl, 4)}
                                             </span>
                                           </div>
 
@@ -1301,7 +1325,7 @@ export default function App() {
                                           </span>
                                         </div>
                                         <span className={`font-mono text-xs font-bold ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                          {legPnL >= 0 ? '+' : ''}{legPnL.toFixed(4)} USDT
+                                          {legPnL >= 0 ? '+' : ''}{formatAmount(legPnL, 4)}
                                         </span>
                                       </div>
 
