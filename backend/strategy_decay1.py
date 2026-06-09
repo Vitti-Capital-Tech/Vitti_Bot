@@ -191,8 +191,14 @@ def execute_decay1_entry(supabase: Client):
         print("No active option contracts parsed.")
         return
         
-    # Get BTC Spot price
-    spot = parsed[0]['spot_price']
+    # Get BTC Futures price (mark price of BTCUSD perpetual)
+    futures_symbol = f"{underlying}USD"
+    spot = ticker_client.get_futures_price(futures_symbol)
+    if spot <= 0:
+        # Fallback to spot_price from options ticker if futures fetch fails
+        spot = parsed[0]['spot_price']
+        print(f"Warning: Futures price unavailable, falling back to spot_price: {spot}")
+    print(f"Using futures price for {futures_symbol}: {spot}")
     
     # Pick Strangle contracts
     contracts = select_strangle_strikes(parsed, spot, strike_selection)
@@ -469,7 +475,12 @@ def monitor_positions_loop(supabase: Client):
             
             # Map ticker by symbol for easy lookup
             ticker_map = {t['symbol']: t for t in tickers}
-            spot = safe_float(tickers[0]['spot_price']) if tickers else 0.0
+            # Use futures mark_price instead of spot_price
+            futures_symbol = 'BTCUSD'
+            spot = client.get_futures_price(futures_symbol)
+            if spot <= 0:
+                spot = safe_float(tickers[0]['spot_price']) if tickers else 0.0
+                print(f"Warning: Futures price unavailable in monitor loop, using spot: {spot}")
             
             # Group open positions in DB by account to reconcile Stop Losses & minimize API calls
             accounts_positions = {}

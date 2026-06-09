@@ -57,8 +57,14 @@ def execute_decay2_entry(supabase: Client):
         print("No active option contracts parsed for Decay2.")
         return
         
-    # Get BTC Spot price
-    spot = parsed[0]['spot_price']
+    # Get BTC Futures price (mark price of BTCUSD perpetual)
+    futures_symbol = f"{underlying}USD"
+    spot = ticker_client.get_futures_price(futures_symbol)
+    if spot <= 0:
+        # Fallback to spot_price from options ticker if futures fetch fails
+        spot = parsed[0]['spot_price']
+        print(f"Warning: Futures price unavailable for Decay2, falling back to spot_price: {spot}")
+    print(f"Decay2 using futures price for {futures_symbol}: {spot}")
     
     # Pick Strangle contracts
     contracts = select_strangle_strikes(parsed, spot, strike_selection)

@@ -198,6 +198,24 @@ class DeltaClient:
             
         return self.request('DELETE', '/v2/orders', payload=payload)
 
+    def get_futures_price(self, symbol: str = 'BTCUSD') -> float:
+        """
+        Fetches the current futures mark price for a given symbol (e.g. 'BTCUSD' perpetual).
+        Uses the public GET /v2/tickers/{symbol} endpoint — no auth required.
+        Returns 0.0 if the request fails.
+        """
+        url = f"{self.base_url}/v2/tickers/{symbol}"
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                res_data = response.json()
+                if res_data.get('success'):
+                    result = res_data.get('result', {})
+                    return float(result.get('mark_price', 0.0) or 0.0)
+            return 0.0
+        except Exception:
+            return 0.0
+
     def cancel_all_orders(self, product_id: Optional[int] = None) -> Dict[str, Any]:
         """
         Cancels all open orders (including conditional bracket orders).
