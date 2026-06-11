@@ -153,7 +153,8 @@ class DeltaClient:
                     limit_price: Optional[str] = None, 
                     sl_price: Optional[str] = None, 
                     tp_price: Optional[str] = None, 
-                    client_order_id: Optional[str] = None) -> Dict[str, Any]:
+                    client_order_id: Optional[str] = None,
+                    stop_trigger_method: str = 'last_traded_price') -> Dict[str, Any]:
         """
         Places a new order on Delta Exchange.
         If sl_price or tp_price are provided, it automatically attaches them as native bracket legs.
@@ -175,12 +176,12 @@ class DeltaClient:
         # Add Stop Loss Bracket Condition
         if sl_price is not None:
             payload["bracket_stop_loss_price"] = str(sl_price)
-            payload["bracket_stop_trigger_method"] = "last_traded_price"
+            payload["bracket_stop_trigger_method"] = stop_trigger_method
             
         # Add Take Profit Bracket Condition
         if tp_price is not None:
             payload["bracket_take_profit_price"] = str(tp_price)
-            payload["bracket_stop_trigger_method"] = "last_traded_price"  # trigger method matches stop trigger
+            payload["bracket_stop_trigger_method"] = stop_trigger_method  # trigger method matches stop trigger
             
         return self.request('POST', '/v2/orders', payload=payload)
 

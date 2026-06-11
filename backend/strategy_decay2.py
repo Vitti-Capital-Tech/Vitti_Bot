@@ -180,12 +180,15 @@ def execute_decay2_entry(supabase: Client):
                     except Exception:
                         pass
                         
-                    # Place Sell Order at market without native exchange brackets (monitored in python)
+                    # Place Sell Order at market with native exchange brackets (SL & TP)
                     order = client.place_order(
                         product_id=prod_id,
                         size=size,
                         side='sell',
                         order_type='market_order',
+                        sl_price=str(sl_price) if sl_price > 0 else None,
+                        tp_price=str(tp_premium) if tp_premium > 0 else None,
+                        stop_trigger_method='last_traded_price', # trigger bracket orders based on option price (LTP)
                         client_order_id=f"decay2_{leg.lower()}_{int(time.time())}"
                     )
                     
@@ -210,24 +213,27 @@ def execute_decay2_entry(supabase: Client):
                         'entry_order_id': order.get('id')
                     }).execute()
                     
-                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Take Profit (Local): {tp_premium}", 'TRADE', 'decay2')
+                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Exchange): {sl_price}. Take Profit (Exchange): {tp_premium}", 'TRADE', 'decay2')
                     
                 except Exception as e:
                     err_str = str(e)
                     if "market_disrupted_post_only_mode" in err_str:
-                        log_trade_event(supabase, name, f"Post-Only mode detected for {symbol}. Retrying with Limit Order at best ask...", 'INFO', 'decay2')
+                        log_trade_event(supabase, name, f"Decay2: Post-Only mode detected for {symbol}. Retrying with Limit Order at best ask...", 'INFO', 'decay2')
                         try:
                             best_ask = safe_float(contract.get('best_ask'), entry_premium)
                             if best_ask <= 0.0:
                                 best_ask = entry_premium
                                 
-                            # Place limit order without native exchange brackets (monitored in python)
+                            # Place limit order with native exchange brackets (SL & TP)
                             order = client.place_order(
                                 product_id=prod_id,
                                 size=size,
                                 side='sell',
                                 order_type='limit_order',
                                 limit_price=str(best_ask),
+                                sl_price=str(sl_price) if sl_price > 0 else None,
+                                tp_price=str(tp_premium) if tp_premium > 0 else None,
+                                stop_trigger_method='last_traded_price',
                                 client_order_id=f"decay2_{leg.lower()}_lim_{int(time.time())}"
                             )
                             
