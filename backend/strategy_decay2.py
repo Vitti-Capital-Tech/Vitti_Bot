@@ -408,10 +408,9 @@ def monitor_positions_loop_decay2(supabase: Client):
                     tp_price = safe_float(pos.get('tp_price'))
                     
                     ticker = ticker_map.get(symbol)
-                    best_ask = 0.0
+                    mark_price = 0.0
                     if ticker:
-                        quotes = ticker.get('quotes', {})
-                        best_ask = safe_float(quotes.get('best_ask')) if quotes else 0.0
+                        mark_price = safe_float(ticker.get('mark_price'))
                     
                     if status == 'close_requested':
                         has_closure_trigger = True
@@ -421,16 +420,16 @@ def monitor_positions_loop_decay2(supabase: Client):
                         has_closure_trigger = True
                         trigger_reason = f"Leg {symbol} was manually closed on Delta Exchange."
                         break
-                    elif status == 'open' and best_ask > 0:
+                    elif status == 'open' and mark_price > 0:
                         # Monitor Stop Loss
-                        if sl_price > 0 and best_ask >= sl_price:
+                        if sl_price > 0 and mark_price >= sl_price:
                             has_closure_trigger = True
-                            trigger_reason = f"Leg {symbol} hit Stop Loss (Ask: {best_ask} >= SL: {sl_price})."
+                            trigger_reason = f"Leg {symbol} hit Stop Loss (Mark: {mark_price} >= SL: {sl_price})."
                             break
                         # Monitor Take Profit
-                        if tp_price > 0 and best_ask <= tp_price:
+                        if tp_price > 0 and mark_price <= tp_price:
                             has_closure_trigger = True
-                            trigger_reason = f"Leg {symbol} hit Take Profit (Ask: {best_ask} <= TP: {tp_price})."
+                            trigger_reason = f"Leg {symbol} hit Take Profit (Mark: {mark_price} <= TP: {tp_price})."
                             break
                         
                 if has_closure_trigger:
@@ -478,7 +477,7 @@ def monitor_positions_loop_decay2(supabase: Client):
                             except Exception as db_err:
                                 print(f"Failed to update db status for Decay2 leg {symbol}: {db_err}")
                 else:
-                    # Update active marks and unrealized PnL (to close we buy back, so we use best_ask)
+                    # Update active marks and unrealized PnL based on Option Mark Price
                     for pos in positions_list:
                         symbol = pos['symbol']
                         entry_price = safe_float(pos['entry_price'])
@@ -486,15 +485,13 @@ def monitor_positions_loop_decay2(supabase: Client):
                         
                         ticker = ticker_map.get(symbol)
                         if ticker:
-                            quotes = ticker.get('quotes', {})
-                            best_ask = safe_float(quotes.get('best_ask')) if quotes else 0.0
-                            ask_price = best_ask if best_ask > 0 else safe_float(ticker.get('mark_price'), entry_price)
+                            mark_price = safe_float(ticker.get('mark_price'), entry_price)
                             multiplier = get_contract_multiplier(symbol)
-                            unrealized_pnl = (entry_price - ask_price) * size * multiplier
+                            unrealized_pnl = (entry_price - mark_price) * size * multiplier
                             
                             try:
                                 supabase.table('positions').update({
-                                    'mark_price': ask_price,
+                                    'mark_price': mark_price,
                                     'pnl': round(unrealized_pnl, 6)
                                 }).eq('id', pos['id']).execute()
                             except Exception:

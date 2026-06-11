@@ -546,20 +546,17 @@ def monitor_positions_loop(supabase: Client):
                     status = pos.get('status', 'open')
                     is_close_requested = (status == 'close_requested')
                     
-                    # 1. Update current mark price (to close we buy back, so we use best_ask) and unrealized PnL
+                    # 1. Update current mark price and unrealized PnL based on Option Mark Price
                     ticker = ticker_map.get(symbol)
-                    ask_price = entry_price
-                    best_ask = 0.0
+                    mark_price = entry_price
                     if ticker:
-                        quotes = ticker.get('quotes', {})
-                        best_ask = safe_float(quotes.get('best_ask')) if quotes else 0.0
-                        ask_price = best_ask if best_ask > 0 else safe_float(ticker.get('mark_price'), entry_price)
+                        mark_price = safe_float(ticker.get('mark_price'), entry_price)
                         multiplier = get_contract_multiplier(symbol)
-                        unrealized_pnl = (entry_price - ask_price) * size * multiplier
-                        print(f"[MONITOR DEBUG] {symbol} | Entry: {entry_price} | Ask: {ask_price} | PnL: {unrealized_pnl:.4f} USDT | SL: {sl_price}")
+                        unrealized_pnl = (entry_price - mark_price) * size * multiplier
+                        print(f"[MONITOR DEBUG] {symbol} | Entry: {entry_price} | Mark: {mark_price} | PnL: {unrealized_pnl:.4f} USDT | SL: {sl_price}")
                         
                         supabase.table('positions').update({
-                            'mark_price': ask_price,
+                            'mark_price': mark_price,
                             'pnl': round(unrealized_pnl, 6)
                         }).eq('id', pos['id']).execute()
                     
@@ -576,8 +573,8 @@ def monitor_positions_loop(supabase: Client):
                             print(f"Failed to update db status for closed option {symbol}: {db_err}")
                         continue
                         
-                    # 3. Check Stop Loss (using Ask price) and Take Profit Spot target
-                    sl_hit = (best_ask >= sl_price) if (best_ask > 0 and sl_price > 0) else False
+                    # 3. Check Stop Loss (using Option Mark Price) and Take Profit Spot target
+                    sl_hit = (mark_price >= sl_price) if (mark_price > 0 and sl_price > 0) else False
                     is_call = symbol.startswith('C-')
                     target_hit = False
                     if is_call and spot <= tp_spot:
@@ -587,7 +584,7 @@ def monitor_positions_loop(supabase: Client):
                         
                     if sl_hit or target_hit or is_close_requested:
                         if sl_hit:
-                            reason = f"Stop Loss Premium Hit (Ask: {best_ask} >= SL: {sl_price})"
+                            reason = f"Stop Loss Premium Hit (Mark: {mark_price} >= SL: {sl_price})"
                         elif is_close_requested:
                             reason = "Manual Square-off request"
                         else:
