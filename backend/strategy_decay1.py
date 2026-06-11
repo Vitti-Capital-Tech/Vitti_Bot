@@ -1,6 +1,7 @@
 import datetime
 import time
 import threading
+import os
 from typing import Dict, Any, List, Optional
 from supabase import create_client, Client
 from delta_client import DeltaClient
@@ -237,8 +238,12 @@ def execute_decay1_entry(supabase: Client):
             except Exception as e:
                 print(f"Notice: Failed to fetch active positions for pre-entry cleanup: {e}")
             
-        # Sizing logic: for this simple deployment, we sell 1 contract (can be made configurable)
-        size = 1 
+        # Sizing logic: load dynamic quantity from environment (default to 1 lot)
+        trade_qty_env = os.getenv("TRADE_QTY", "1")
+        try:
+            size = int(float(trade_qty_env))
+        except Exception:
+            size = 1
         
         # Execution of both legs
         for leg, contract in [('Call', call_contract), ('Put', put_contract)]:

@@ -101,7 +101,13 @@ def execute_decay2_entry(supabase: Client):
             except Exception as e:
                 print(f"Notice: Failed to fetch active positions for Decay2 pre-entry cleanup: {e}")
             
-        size = 1 
+        # Sizing logic: load dynamic quantity from environment (default to 1 lot)
+        import os
+        trade_qty_env = os.getenv("TRADE_QTY", "1")
+        try:
+            size = int(float(trade_qty_env))
+        except Exception:
+            size = 1
         
         # Execution of both legs
         for leg, contract in [('Call', call_contract), ('Put', put_contract)]:
