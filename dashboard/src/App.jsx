@@ -151,7 +151,7 @@ export default function App() {
         if (pos.data) setPositions(pos.data)
         
         // 4. Fetch Logs
-        const lg = await supabase.from('trade_logs').select('*').order('created_at', { ascending: false }).limit(40)
+        const lg = await supabase.from('trade_logs').select('*').order('created_at', { ascending: false }).limit(200)
         if (lg.data) {
           setLogs(lg.data)
           if (lg.data.length > 0) {
