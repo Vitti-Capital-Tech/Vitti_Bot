@@ -281,16 +281,15 @@ def execute_decay1_entry(supabase: Client):
             # Fetch current premium for the leg (use best_bid for short strangle entry)
             entry_premium = contract['best_bid'] if contract['best_bid'] > 0 else (contract['mark_price'] if contract['mark_price'] > 0 else 50.0)
             
-            # Calculate SL Trigger Premium (1.40x for short strangle)
-            sl_price = round(entry_premium * sl_multiplier, 2)
-            
-            # Calculate Target Underlying Spot Price (0.75% move)
-            # Short Call target: Spot drops by 0.75%
-            # Short Put target: Spot rises by 0.75%
+            # Calculate Target Underlying Spot Price (TP: 0.75% move, SL: 1.50% move)
+            # Short Call: Profit if BTC drops (TP), Loss if BTC rises (SL)
+            # Short Put: Profit if BTC rises (TP), Loss if BTC drops (SL)
             if leg == 'Call':
                 tp_spot = round(spot * (1 - tgt_pct), 2)
+                sl_price = round(spot * (1 + 0.0150), 2) # SL on Index Price (1.5% rise)
             else:
                 tp_spot = round(spot * (1 + tgt_pct), 2)
+                sl_price = round(spot * (1 - 0.0150), 2) # SL on Index Price (1.5% drop)
                 
             if is_paper:
                 # Simulated paper execution
@@ -307,8 +306,8 @@ def execute_decay1_entry(supabase: Client):
                         'size': size,
                         'entry_price': fill_price,
                         'mark_price': fill_price,
-                        'sl_price': sl_price,
-                        'tp_price': tp_spot, # tp_price holds target SPOT price for code monitoring
+                        'sl_price': sl_price, # sl_price holds target SPOT price for monitoring/display
+                        'tp_price': tp_spot,  # tp_price holds target SPOT price for monitoring/display
                         'pnl': 0.00,
                         'status': 'open',
                         'entry_order_id': 999999 # Simulated mock ID
@@ -571,22 +570,31 @@ def monitor_positions_loop(supabase: Client):
                             print(f"Failed to update db status for closed option {symbol}: {db_err}")
                         continue
                         
-                    # 3. Check Stop Loss (using Ask price) and Take Profit Spot target
-                    sl_hit = (best_ask >= sl_price) if (best_ask > 0 and sl_price > 0) else False
+                    # 3. Check Stop Loss and Take Profit Spot (Index) targets
                     is_call = symbol.startswith('C-')
+                    sl_hit = False
                     target_hit = False
-                    if is_call and spot <= tp_spot:
-                        target_hit = True
-                    elif not is_call and spot >= tp_spot:
-                        target_hit = True
+                    
+                    if is_call:
+                        # Short Call: SL is triggered if BTC rises >= sl_price. TP is triggered if BTC drops <= tp_spot.
+                        if spot >= sl_price:
+                            sl_hit = True
+                        if spot <= tp_spot:
+                            target_hit = True
+                    else:
+                        # Short Put: SL is triggered if BTC drops <= sl_price. TP is triggered if BTC rises >= tp_spot.
+                        if spot <= sl_price:
+                            sl_hit = True
+                        if spot >= tp_spot:
+                            target_hit = True
                         
                     if sl_hit or target_hit or is_close_requested:
                         if sl_hit:
-                            reason = f"Stop Loss Premium Hit (Ask: {best_ask} >= SL: {sl_price})"
+                            reason = f"Spot Stop Loss Hit (Spot: {spot} | Target SL: {sl_price})"
                         elif is_close_requested:
                             reason = "Manual Square-off request"
                         else:
-                            reason = f"Spot Target Hit ({spot})"
+                            reason = f"Spot Target Hit (Spot: {spot} | Target TP: {tp_spot})"
                             
                         log_trade_event(supabase, acc['name'], f"{reason}. Closing leg {symbol} {'(Paper)' if is_paper else 'on exchange'}...", 'TRADE', 'decay1')
                         
