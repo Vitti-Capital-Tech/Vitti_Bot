@@ -341,12 +341,13 @@ def execute_decay2_exit(supabase: Client):
                 }).eq('id', pos['id']).execute()
                 log_trade_event(supabase, acc['name'], f"Time exit triggered (Paper). Closed Short Strangle leg: {pos['symbol']}", 'TRADE', 'decay2')
             else:
-                # Place buy order at market to close the position
+                # Place buy order at market to close the position with reduce_only protection
                 client.place_order(
                     product_id=pos['product_id'],
                     size=pos['size'],
                     side='buy',
-                    order_type='market_order'
+                    order_type='market_order',
+                    reduce_only=True
                 )
                 
                 # Cancel all resting orders/brackets to avoid false orders later
@@ -481,7 +482,8 @@ def monitor_positions_loop_decay2(supabase: Client):
                                         product_id=prod_id,
                                         size=size,
                                         side='buy',
-                                        order_type='market_order'
+                                        order_type='market_order',
+                                        reduce_only=True
                                     )
                                     log_trade_event(supabase, acc['name'], f"Decay2: Successfully squared off remaining leg {symbol}.", 'TRADE', 'decay2')
                                 except Exception as e:
