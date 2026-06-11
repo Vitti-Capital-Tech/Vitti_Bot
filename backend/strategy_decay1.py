@@ -628,7 +628,23 @@ def monitor_positions_loop(supabase: Client):
                                 
                                 log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} on exchange.", 'TRADE', 'decay1')
                             except Exception as e:
-                                log_trade_event(supabase, acc['name'], f"Failed to execute close for {symbol}: {e}", 'ERROR', 'decay1')
+                                err_str = str(e)
+                                if "no_position_for_reduce_only" in err_str:
+                                    log_trade_event(supabase, acc['name'], f"Position {symbol} already closed on exchange (no_position_for_reduce_only). Updating status in DB...", 'INFO', 'decay1')
+                                    try:
+                                        # Cancel all resting orders/brackets anyway
+                                        try:
+                                            trading_client.cancel_all_orders(product_id=prod_id)
+                                        except Exception:
+                                            pass
+                                        supabase.table('positions').update({
+                                            'status': 'closed',
+                                            'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+                                        }).eq('id', pos['id']).execute()
+                                    except Exception as db_err:
+                                        print(f"Failed to update db status for closed option {symbol}: {db_err}")
+                                else:
+                                    log_trade_event(supabase, acc['name'], f"Failed to execute close for {symbol}: {e}", 'ERROR', 'decay1')
                             
         except Exception as e:
             err_msg = str(e)
