@@ -180,15 +180,12 @@ def execute_decay2_entry(supabase: Client):
                     except Exception:
                         pass
                         
-                    # Place Sell Order at market with native exchange brackets (SL & TP)
+                    # 1. Place the Entry Sell Order at market (no brackets attached)
                     order = client.place_order(
                         product_id=prod_id,
                         size=size,
                         side='sell',
                         order_type='market_order',
-                        sl_price=str(sl_price) if sl_price > 0 else None,
-                        tp_price=str(tp_premium) if tp_premium > 0 else None,
-                        stop_trigger_method='last_traded_price', # trigger bracket orders based on option price (LTP)
                         client_order_id=f"decay2_{leg.lower()}_{int(time.time())}"
                     )
                     
@@ -196,6 +193,38 @@ def execute_decay2_entry(supabase: Client):
                     if fill_price <= 0.0:
                         fill_price = entry_premium
                     
+                    # 2. Place Stop Loss (Buy Stop Market order triggered by option Last Traded Price)
+                    sl_order_id = None
+                    try:
+                        sl_order = client.request('POST', '/v2/orders', payload={
+                            "product_id": int(prod_id),
+                            "size": int(size),
+                            "side": "buy",
+                            "order_type": "stop_market",
+                            "stop_order_type": "stop_loss_order",
+                            "stop_price": str(sl_price),
+                            "stop_trigger_method": "last_traded_price",
+                            "reduce_only": True
+                        })
+                        sl_order_id = sl_order.get('id')
+                    except Exception as sl_err:
+                        log_trade_event(supabase, name, f"Failed to attach native SL order for Decay2 {symbol}: {sl_err}", 'ERROR', 'decay2')
+                        
+                    # 3. Place Take Profit (Limit Buy order with reduce_only=True at TP premium level)
+                    tp_order_id = None
+                    try:
+                        tp_order = client.request('POST', '/v2/orders', payload={
+                            "product_id": int(prod_id),
+                            "size": int(size),
+                            "side": "buy",
+                            "order_type": "limit_order",
+                            "limit_price": str(tp_premium),
+                            "reduce_only": True
+                        })
+                        tp_order_id = tp_order.get('id')
+                    except Exception as tp_err:
+                        log_trade_event(supabase, name, f"Failed to attach native TP limit order for Decay2 {symbol}: {tp_err}", 'ERROR', 'decay2')
+
                     # Insert position details into Supabase
                     supabase.table('positions').insert({
                         'account_id': acc['id'],
@@ -213,7 +242,7 @@ def execute_decay2_entry(supabase: Client):
                         'entry_order_id': order.get('id')
                     }).execute()
                     
-                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Exchange): {sl_price}. Take Profit (Exchange): {tp_premium}", 'TRADE', 'decay2')
+                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Exchange - Mark): {sl_price}. Take Profit (Exchange Limit): {tp_premium}", 'TRADE', 'decay2')
                     
                 except Exception as e:
                     err_str = str(e)
@@ -224,21 +253,46 @@ def execute_decay2_entry(supabase: Client):
                             if best_ask <= 0.0:
                                 best_ask = entry_premium
                                 
-                            # Place limit order with native exchange brackets (SL & TP)
+                            # Place limit order
                             order = client.place_order(
                                 product_id=prod_id,
                                 size=size,
                                 side='sell',
                                 order_type='limit_order',
                                 limit_price=str(best_ask),
-                                sl_price=str(sl_price) if sl_price > 0 else None,
-                                tp_price=str(tp_premium) if tp_premium > 0 else None,
-                                stop_trigger_method='last_traded_price',
                                 client_order_id=f"decay2_{leg.lower()}_lim_{int(time.time())}"
                             )
                             
                             fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
                             
+                            # Attach SL
+                            try:
+                                client.request('POST', '/v2/orders', payload={
+                                    "product_id": int(prod_id),
+                                    "size": int(size),
+                                    "side": "buy",
+                                    "order_type": "stop_market",
+                                    "stop_order_type": "stop_loss_order",
+                                    "stop_price": str(sl_price),
+                                    "stop_trigger_method": "last_traded_price",
+                                    "reduce_only": True
+                                })
+                            except Exception as sl_err:
+                                log_trade_event(supabase, name, f"Failed to attach native SL for limit fallback {symbol}: {sl_err}", 'ERROR', 'decay2')
+                                
+                            # Attach TP Limit
+                            try:
+                                client.request('POST', '/v2/orders', payload={
+                                    "product_id": int(prod_id),
+                                    "size": int(size),
+                                    "side": "buy",
+                                    "order_type": "limit_order",
+                                    "limit_price": str(tp_premium),
+                                    "reduce_only": True
+                                })
+                            except Exception as tp_err:
+                                log_trade_event(supabase, name, f"Failed to attach native TP limit for limit fallback {symbol}: {tp_err}", 'ERROR', 'decay2')
+
                             supabase.table('positions').insert({
                                 'account_id': acc['id'],
                                 'strategy_name': 'decay2',
