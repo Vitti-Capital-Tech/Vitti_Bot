@@ -203,7 +203,7 @@ def execute_decay2_entry(supabase: Client):
                             "order_type": "market_order",
                             "stop_order_type": "stop_loss_order",
                             "stop_price": str(sl_price),
-                            "stop_trigger_method": "last_traded_price",
+                            "stop_trigger_method": "mark_price",
                             "reduce_only": True
                         })
                         sl_order_id = sl_order.get('id')
@@ -274,7 +274,7 @@ def execute_decay2_entry(supabase: Client):
                                     "order_type": "market_order",
                                     "stop_order_type": "stop_loss_order",
                                     "stop_price": str(sl_price),
-                                    "stop_trigger_method": "last_traded_price",
+                                    "stop_trigger_method": "mark_price",
                                     "reduce_only": True
                                 })
                             except Exception as sl_err:
