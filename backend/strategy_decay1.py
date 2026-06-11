@@ -281,15 +281,16 @@ def execute_decay1_entry(supabase: Client):
             # Fetch current premium for the leg (use best_bid for short strangle entry)
             entry_premium = contract['best_bid'] if contract['best_bid'] > 0 else (contract['mark_price'] if contract['mark_price'] > 0 else 50.0)
             
-            # Calculate Target Underlying Spot Price (TP: 0.75% move, SL: 1.50% move)
-            # Short Call: Profit if BTC drops (TP), Loss if BTC rises (SL)
-            # Short Put: Profit if BTC rises (TP), Loss if BTC drops (SL)
+            # Calculate premium SL trigger (1.4x entry premium)
+            sl_price_premium = round(entry_premium * sl_multiplier, 2)
+
+            # Calculate Target Underlying Spot Price (TP: 0.75% move)
+            # Short Call: Profit if BTC drops (TP)
+            # Short Put: Profit if BTC rises (TP)
             if leg == 'Call':
                 tp_spot = round(spot * (1 - tgt_pct), 2)
-                sl_price = round(spot * (1 + 0.0150), 2) # SL on Index Price (1.5% rise)
             else:
                 tp_spot = round(spot * (1 + tgt_pct), 2)
-                sl_price = round(spot * (1 - 0.0150), 2) # SL on Index Price (1.5% drop)
                 
             if is_paper:
                 # Simulated paper execution
@@ -306,42 +307,73 @@ def execute_decay1_entry(supabase: Client):
                         'size': size,
                         'entry_price': fill_price,
                         'mark_price': fill_price,
-                        'sl_price': sl_price, # sl_price holds target SPOT price for monitoring/display
+                        'sl_price': sl_price_premium, # database stores premium SL for dashboard/code
                         'tp_price': tp_spot,  # tp_price holds target SPOT price for monitoring/display
                         'pnl': 0.00,
                         'status': 'open',
                         'entry_order_id': 999999 # Simulated mock ID
                     }).execute()
                     
-                    log_trade_event(supabase, name, f"Placed Paper {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Spot Target: {tp_spot}", 'TRADE')
+                    log_trade_event(supabase, name, f"Placed Paper {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price_premium}. Spot Target: {tp_spot}", 'TRADE')
                 except Exception as e:
                     log_trade_event(supabase, name, f"Failed to place Paper {leg} Short {symbol}: {e}", 'ERROR')
             else:
                 # Real exchange execution
                 try:
-                    # Pre-emptively clear any stale resting orders/brackets on this product first to avoid bracket_order_position_exists error
+                    # Pre-emptively clear any stale resting orders/brackets on this product first
                     try:
                         client.cancel_order(product_id=prod_id)
                     except Exception:
                         pass
                         
-                    # Place Sell Order at market with native exchange brackets (SL & TP)
+                    # 1. Place the Entry Sell Order at market (no brackets attached here)
                     order = client.place_order(
                         product_id=prod_id,
                         size=size,
                         side='sell',
                         order_type='market_order',
-                        sl_price=str(sl_price) if sl_price > 0 else None,
-                        tp_price=str(tp_spot) if tp_spot > 0 else None,
-                        stop_trigger_method='spot_price', # trigger bracket orders based on underlying spot/index price
                         client_order_id=f"decay1_{leg.lower()}_{int(time.time())}"
                     )
                     
-                    # Fetch actual fill price from average fill output if available, or fall back to estimated entry premium
+                    # Fetch actual fill price
                     fill_price = safe_float(order.get('avg_fill_price'))
                     if fill_price <= 0.0:
                         fill_price = entry_premium
                     
+                    # 2. Attach Stop Loss (Buy Stop Market order triggered by option Last Traded Price)
+                    sl_order_id = None
+                    try:
+                        sl_order = client.request('POST', '/v2/orders', payload={
+                            "product_id": int(prod_id),
+                            "size": int(size),
+                            "side": "buy",
+                            "order_type": "stop_market",
+                            "stop_order_type": "stop_loss_order",
+                            "stop_price": str(sl_price_premium),
+                            "stop_trigger_method": "last_traded_price",
+                            "reduce_only": True
+                        })
+                        sl_order_id = sl_order.get('id')
+                    except Exception as sl_err:
+                        log_trade_event(supabase, name, f"Failed to attach native SL order for {symbol}: {sl_err}", 'ERROR')
+                        
+                    # 3. Attach Take Profit (Buy Stop Market order triggered by underlying Spot Price)
+                    tp_order_id = None
+                    try:
+                        tp_order = client.request('POST', '/v2/orders', payload={
+                            "product_id": int(prod_id),
+                            "size": int(size),
+                            "side": "buy",
+                            "order_type": "stop_market",
+                            "stop_order_type": "take_profit_order",
+                            "stop_price": str(tp_spot),
+                            "stop_trigger_method": "spot_price",
+                            "reduce_only": True
+                        })
+                        tp_order_id = tp_order.get('id')
+                    except Exception as tp_err:
+                        log_trade_event(supabase, name, f"Failed to attach native TP order for {symbol}: {tp_err}", 'ERROR')
+
                     # Insert position details into Supabase
                     supabase.table('positions').insert({
                         'account_id': acc['id'],
@@ -352,41 +384,66 @@ def execute_decay1_entry(supabase: Client):
                         'size': size,
                         'entry_price': fill_price,
                         'mark_price': fill_price,
-                        'sl_price': sl_price,
-                        'tp_price': tp_spot, # tp_price holds target SPOT price for code monitoring
+                        'sl_price': sl_price_premium, # database stores premium SL for dashboard/code
+                        'tp_price': tp_spot,
                         'pnl': 0.00,
                         'status': 'open',
                         'entry_order_id': order.get('id')
                     }).execute()
                     
-                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Exchange): {sl_price}. Spot Target (Exchange): {tp_spot}", 'TRADE')
+                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Exchange - Mark): {sl_price_premium}. Take Profit (Exchange - Index): {tp_spot}", 'TRADE')
                     
                 except Exception as e:
                     err_str = str(e)
                     if "market_disrupted_post_only_mode" in err_str:
-                        log_trade_event(supabase, name, f"Post-Only mode detected for {symbol}. Retrying with Limit Order at best ask...", 'INFO')
+                        log_trade_event(supabase, name, f"Post-Only mode detected for {symbol}. Retrying with Limit Order...", 'INFO')
                         try:
-                            # Fallback price: use best_ask for sell limit order (maker)
                             best_ask = safe_float(contract.get('best_ask'), entry_premium)
                             if best_ask <= 0.0:
                                 best_ask = entry_premium
                                 
-                            # Place limit order with native exchange brackets (SL & TP)
+                            # Place limit order
                             order = client.place_order(
                                 product_id=prod_id,
                                 size=size,
                                 side='sell',
                                 order_type='limit_order',
                                 limit_price=str(best_ask),
-                                sl_price=str(sl_price) if sl_price > 0 else None,
-                                tp_price=str(tp_spot) if tp_spot > 0 else None,
-                                stop_trigger_method='spot_price',
                                 client_order_id=f"decay1_{leg.lower()}_lim_{int(time.time())}"
                             )
                             
-                            # Fetch actual fill price or use limit best_ask
                             fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
                             
+                            # Attach Stop Loss
+                            try:
+                                client.request('POST', '/v2/orders', payload={
+                                    "product_id": int(prod_id),
+                                    "size": int(size),
+                                    "side": "buy",
+                                    "order_type": "stop_market",
+                                    "stop_order_type": "stop_loss_order",
+                                    "stop_price": str(sl_price_premium),
+                                    "stop_trigger_method": "last_traded_price",
+                                    "reduce_only": True
+                                })
+                            except Exception as sl_err:
+                                log_trade_event(supabase, name, f"Failed to attach native SL for limit fallback {symbol}: {sl_err}", 'ERROR')
+                                
+                            # Attach Take Profit
+                            try:
+                                client.request('POST', '/v2/orders', payload={
+                                    "product_id": int(prod_id),
+                                    "size": int(size),
+                                    "side": "buy",
+                                    "order_type": "stop_market",
+                                    "stop_order_type": "take_profit_order",
+                                    "stop_price": str(tp_spot),
+                                    "stop_trigger_method": "spot_price",
+                                    "reduce_only": True
+                                })
+                            except Exception as tp_err:
+                                log_trade_event(supabase, name, f"Failed to attach native TP for limit fallback {symbol}: {tp_err}", 'ERROR')
+
                             # Insert position details into Supabase
                             supabase.table('positions').insert({
                                 'account_id': acc['id'],
@@ -397,14 +454,14 @@ def execute_decay1_entry(supabase: Client):
                                 'size': size,
                                 'entry_price': fill_price,
                                 'mark_price': fill_price,
-                                'sl_price': sl_price,
+                                'sl_price': sl_price_premium,
                                 'tp_price': tp_spot,
                                 'pnl': 0.00,
                                 'status': 'open',
                                 'entry_order_id': order.get('id')
                             }).execute()
                             
-                            log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Exchange): {sl_price}. Spot Target (Exchange): {tp_spot}", 'TRADE')
+                            log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Exchange - Mark): {sl_price_premium}. Take Profit (Exchange - Index): {tp_spot}", 'TRADE')
                         except Exception as limit_err:
                             log_trade_event(supabase, name, f"Limit order fallback also failed for {symbol}: {limit_err}", 'ERROR')
                     else:
@@ -570,27 +627,18 @@ def monitor_positions_loop(supabase: Client):
                             print(f"Failed to update db status for closed option {symbol}: {db_err}")
                         continue
                         
-                    # 3. Check Stop Loss and Take Profit Spot (Index) targets
+                    # 3. Check Stop Loss (using Ask price) and Take Profit Spot target
+                    sl_hit = (best_ask >= sl_price) if (best_ask > 0 and sl_price > 0) else False
                     is_call = symbol.startswith('C-')
-                    sl_hit = False
                     target_hit = False
-                    
-                    if is_call:
-                        # Short Call: SL is triggered if BTC rises >= sl_price. TP is triggered if BTC drops <= tp_spot.
-                        if spot >= sl_price:
-                            sl_hit = True
-                        if spot <= tp_spot:
-                            target_hit = True
-                    else:
-                        # Short Put: SL is triggered if BTC drops <= sl_price. TP is triggered if BTC rises >= tp_spot.
-                        if spot <= sl_price:
-                            sl_hit = True
-                        if spot >= tp_spot:
+                    if is_call and spot <= tp_spot:
+                        target_hit = True
+                    elif not is_call and spot >= tp_spot:
                             target_hit = True
                         
                     if sl_hit or target_hit or is_close_requested:
                         if sl_hit:
-                            reason = f"Spot Stop Loss Hit (Spot: {spot} | Target SL: {sl_price})"
+                            reason = f"Stop Loss Premium Hit (Ask: {best_ask} >= SL: {sl_price})"
                         elif is_close_requested:
                             reason = "Manual Square-off request"
                         else:
