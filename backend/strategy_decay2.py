@@ -141,11 +141,14 @@ def execute_decay2_entry(supabase: Client):
             # Fetch current premium for the leg (use best_bid for short strangle entry)
             entry_premium = contract['best_bid'] if contract['best_bid'] > 0 else (contract['mark_price'] if contract['mark_price'] > 0 else 50.0)
             
+            # Fetch current mark price for the option at entry
+            mark_price_at_entry = contract['mark_price'] if contract['mark_price'] > 0 else (contract['best_bid'] if contract['best_bid'] > 0 else 50.0)
+            
             # Calculate SL Trigger Premium (2.0x for short strangle decay2)
-            sl_price = round(entry_premium * sl_multiplier, 2)
+            sl_price = round(mark_price_at_entry * sl_multiplier, 2)
             
             # Calculate TP Trigger Premium (0.20x for short strangle decay2)
-            tp_premium = round(entry_premium * tgt_mult, 2)
+            tp_premium = round(mark_price_at_entry * tgt_mult, 2)
             
             if is_paper:
                 # Simulated paper execution for Decay2
