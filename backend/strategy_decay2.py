@@ -193,22 +193,8 @@ def execute_decay2_entry(supabase: Client):
                     if fill_price <= 0.0:
                         fill_price = entry_premium
                     
-                    # 2. Place Stop Loss (Buy Stop Market order triggered by option Last Traded Price)
-                    sl_order_id = None
-                    try:
-                        sl_order = client.request('POST', '/v2/orders', payload={
-                            "product_id": int(prod_id),
-                            "size": int(size),
-                            "side": "buy",
-                            "order_type": "market_order",
-                            "stop_order_type": "stop_loss_order",
-                            "stop_price": str(sl_price),
-                            "stop_trigger_method": "mark_price",
-                            "reduce_only": True
-                        })
-                        sl_order_id = sl_order.get('id')
-                    except Exception as sl_err:
-                        log_trade_event(supabase, name, f"Failed to attach native SL order for Decay2 {symbol}: {sl_err}", 'ERROR', 'decay2')
+                    # Native Stop Loss order for Options is unsupported by Delta Exchange API.
+                    # We rely entirely on the monitor_positions_loop to trigger the SL.
                         
                     # 3. Place Take Profit (Limit Buy order with reduce_only=True at TP premium level)
                     tp_order_id = None
@@ -265,20 +251,8 @@ def execute_decay2_entry(supabase: Client):
                             
                             fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
                             
-                            # Attach SL
-                            try:
-                                client.request('POST', '/v2/orders', payload={
-                                    "product_id": int(prod_id),
-                                    "size": int(size),
-                                    "side": "buy",
-                                    "order_type": "market_order",
-                                    "stop_order_type": "stop_loss_order",
-                                    "stop_price": str(sl_price),
-                                    "stop_trigger_method": "mark_price",
-                                    "reduce_only": True
-                                })
-                            except Exception as sl_err:
-                                log_trade_event(supabase, name, f"Failed to attach native SL for limit fallback {symbol}: {sl_err}", 'ERROR', 'decay2')
+                            # Native Stop Loss order for Options is unsupported by Delta Exchange API.
+                            # We rely entirely on the monitor_positions_loop to trigger the SL.
                                 
                             # Attach TP Limit
                             try:

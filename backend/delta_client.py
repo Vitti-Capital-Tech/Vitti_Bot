@@ -154,7 +154,8 @@ class DeltaClient:
                     sl_price: Optional[str] = None, 
                     tp_price: Optional[str] = None, 
                     client_order_id: Optional[str] = None,
-                    stop_trigger_method: str = 'last_traded_price') -> Dict[str, Any]:
+                    stop_trigger_method: str = 'last_traded_price',
+                    reduce_only: bool = False) -> Dict[str, Any]:
         """
         Places a new order on Delta Exchange.
         If sl_price or tp_price are provided, it automatically attaches them as native bracket legs.
@@ -164,7 +165,7 @@ class DeltaClient:
             "size": int(size),
             "side": side.lower(),
             "order_type": order_type,
-            "reduce_only": False,
+            "reduce_only": reduce_only,
             "time_in_force": "gtc"
         }
         
