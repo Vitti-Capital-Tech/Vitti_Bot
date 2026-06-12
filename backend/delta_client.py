@@ -247,7 +247,8 @@ class DeltaClient:
                     "product_id": int(product_id),
                     "size": int(size),
                     "side": "buy" if side.lower() == "sell" else "sell",
-                    "order_type": "market_order",
+                    "order_type": "limit_order",
+                    "limit_price": str(tp_price),
                     "stop_price": str(tp_price),
                     "stop_order_type": "take_profit_order",
                     "stop_trigger_method": tp_trigger_method,
@@ -282,7 +283,8 @@ class DeltaClient:
                 "product_id": int(product_id),
                 "size": int(size),
                 "side": "buy",   # closing a short position
-                "order_type": "market_order",
+                "order_type": "limit_order",
+                "limit_price": str(sl_price),
                 "stop_price": str(sl_price),
                 "stop_order_type": "stop_loss_order",
                 "stop_trigger_method": sl_trigger_method,
@@ -299,7 +301,8 @@ class DeltaClient:
                 "product_id": int(product_id),
                 "size": int(size),
                 "side": "buy",   # closing a short position
-                "order_type": "market_order",
+                "order_type": "limit_order",
+                "limit_price": str(tp_price),
                 "stop_price": str(tp_price),
                 "stop_order_type": "take_profit_order",
                 "stop_trigger_method": tp_trigger_method,
@@ -311,6 +314,7 @@ class DeltaClient:
                 results['tp_error'] = str(e)
 
         return results
+
     def cancel_order(self, product_id: int, order_id: Optional[int] = None, client_order_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Cancels a pending/resting order.
