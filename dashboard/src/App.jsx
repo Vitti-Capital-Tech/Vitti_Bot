@@ -883,9 +883,12 @@ export default function App() {
                 const bal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
                 return (
                   <div key={acc.id} className="flex items-center justify-between border-b border-white/[0.02] last:border-0 pb-2 last:pb-0 gap-4">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${acc.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-                      <span className="text-xs font-bold text-white font-sans uppercase tracking-wide truncate">{baseName}</span>
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${acc.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                       <span className="text-xs font-bold text-white font-sans uppercase tracking-wide truncate">{baseName}</span>
+                       <span className="text-[8px] font-mono font-bold text-indigo-400 bg-indigo-950/40 border border-indigo-800/20 px-1.5 py-0.5 rounded shrink-0">
+                         {acc.lots || 1} {(acc.lots || 1) === 1 ? 'Lot' : 'Lots'}
+                       </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs font-mono font-bold text-cyan-400">{formatAmount(bal, 2)}</span>
@@ -961,12 +964,7 @@ export default function App() {
                               {/* Pulsing Status Indicator */}
                               <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 live-dot shadow-[0_0_8px_rgba(34,211,238,0.4)] shrink-0" />
                               <div>
-                                <h4 className="font-bold text-white text-lg tracking-tight flex items-center gap-2">
-                                  {group.accountName} 
-                                  <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/40 border border-cyan-800/30 px-2 py-0.5 rounded tracking-wide uppercase">
-                                    Lots: {group.lots || 1}
-                                  </span>
-                                </h4>
+                                <h4 className="font-bold text-white text-lg tracking-tight">{group.accountName}</h4>
                                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                   <span className={`text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md ${
                                     group.env === 'production' 
