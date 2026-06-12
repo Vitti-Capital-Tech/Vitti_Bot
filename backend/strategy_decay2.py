@@ -423,16 +423,16 @@ def monitor_positions_loop_decay2(supabase: Client):
                         has_closure_trigger = True
                         trigger_reason = f"Leg {symbol} was manually closed on Delta Exchange."
                         break
-                    elif status == 'open' and mark_price > 0:
+                    elif status == 'open' and mark_price > 0 and is_paper:
                         # Monitor Stop Loss
                         if sl_price > 0 and mark_price >= sl_price:
                             has_closure_trigger = True
-                            trigger_reason = f"Leg {symbol} hit Stop Loss (Mark: {mark_price} >= SL: {sl_price})."
+                            trigger_reason = f"Leg {symbol} hit Stop Loss (Mark: {mark_price} >= SL: {sl_price}) (Paper)."
                             break
                         # Monitor Take Profit
                         if tp_price > 0 and mark_price <= tp_price:
                             has_closure_trigger = True
-                            trigger_reason = f"Leg {symbol} hit Take Profit (Mark: {mark_price} <= TP: {tp_price})."
+                            trigger_reason = f"Leg {symbol} hit Take Profit (Mark: {mark_price} <= TP: {tp_price}) (Paper)."
                             break
                         
                 if has_closure_trigger:

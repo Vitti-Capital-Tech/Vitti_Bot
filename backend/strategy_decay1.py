@@ -613,13 +613,14 @@ def monitor_positions_loop(supabase: Client):
                     elif not is_call and spot >= tp_spot:
                             target_hit = True
                         
-                    if sl_hit or target_hit or is_close_requested:
-                        if sl_hit:
-                            reason = f"Stop Loss Premium Hit (Mark: {mark_price} >= SL: {sl_price})"
-                        elif is_close_requested:
+                    trigger_exit = is_close_requested or (is_paper and (sl_hit or target_hit))
+                    if trigger_exit:
+                        if is_close_requested:
                             reason = "Manual Square-off request"
+                        elif sl_hit:
+                            reason = f"Stop Loss Premium Hit (Mark: {mark_price} >= SL: {sl_price}) (Paper)"
                         else:
-                            reason = f"Spot Target Hit (Spot: {spot} | Target TP: {tp_spot})"
+                            reason = f"Spot Target Hit (Spot: {spot} | Target TP: {tp_spot}) (Paper)"
                             
                         log_trade_event(supabase, acc['name'], f"{reason}. Closing leg {symbol} {'(Paper)' if is_paper else 'on exchange'}...", 'TRADE', 'decay1')
                         
