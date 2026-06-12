@@ -881,19 +881,19 @@ export default function App() {
                 const baseName = nameParts[0]
                 const bal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
                 return (
-                  <div key={acc.id} className="flex items-center justify-between border-b border-white/[0.02] last:border-0 pb-2 last:pb-0">
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white font-sans uppercase tracking-wide flex items-center gap-1.5 truncate">
-                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${acc.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
-                        <span className="truncate">{baseName}</span>
-                        <span className="text-[9px] font-mono text-gray-500 shrink-0">({formatAmount(bal, 2)})</span>
-                      </p>
+                  <div key={acc.id} className="flex items-center justify-between border-b border-white/[0.02] last:border-0 pb-2 last:pb-0 gap-4">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${acc.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                      <span className="text-xs font-bold text-white font-sans uppercase tracking-wide truncate">{baseName}</span>
                     </div>
-                    <span className={`text-[8px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded border shrink-0 ${
-                      acc.is_active
-                      ? 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15'
-                      : 'text-rose-400 bg-rose-500/8 border-rose-500/15'
-                    }`}>{acc.is_active ? 'On' : 'Off'}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-mono font-bold text-cyan-400">{formatAmount(bal, 2)}</span>
+                      <span className={`text-[8px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded border ${
+                        acc.is_active
+                        ? 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15'
+                        : 'text-rose-400 bg-rose-500/8 border-rose-500/15'
+                      }`}>{acc.is_active ? 'On' : 'Off'}</span>
+                    </div>
                   </div>
                 )
               })}
