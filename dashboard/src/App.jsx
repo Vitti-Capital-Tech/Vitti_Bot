@@ -1548,49 +1548,36 @@ export default function App() {
                                     <span>Active</span>
                                   </div>
                                 </div>
-                                <div className="my-2.5 flex items-center justify-between gap-2">
                                   <div className="flex flex-col gap-1">
                                     <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest font-bold">Execution Size</span>
-                                    <div className="flex items-center bg-white/[0.02] border border-white/5 rounded-lg p-0.5 mt-0.5 w-max select-none">
-                                      <button 
-                                        type="button"
-                                        onClick={async () => {
-                                          const currentLots = acc.lots || 1
-                                          if (currentLots <= 1) return
-                                          const val = currentLots - 1
+                                    <div className="flex items-center gap-1.5 mt-0.5 select-none">
+                                      <input 
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        defaultValue={acc.lots || 1}
+                                        onBlur={async (e) => {
+                                          const val = parseInt(e.target.value) || 1
+                                          if (val < 1) return
                                           try {
                                             await supabase.from('accounts').update({ lots: val }).eq('id', acc.id)
                                             setRefreshTrigger(prev => prev + 1)
-                                            showToast(`Lots size decreased to ${val} for ${(acc.name || '').split('|')[0]}`, 'success')
+                                            showToast(`Lots size set to ${val} for ${(acc.name || '').split('|')[0]}`, 'success')
                                           } catch (err) {
                                             console.error(err)
                                             showToast("Failed to update lots.", "error")
                                           }
                                         }}
-                                        className="w-5 h-5 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-all duration-200 cursor-pointer focus:outline-none active:scale-90"
-                                      >
-                                        -
-                                      </button>
-                                      <span className="text-[10px] font-extrabold text-white font-sans px-2 min-w-[32px] text-center tracking-tight">
-                                        {acc.lots || 1} <span className="text-[7px] text-gray-500 font-semibold font-sans normal-case ml-0.5">{(acc.lots || 1) === 1 ? 'Lot' : 'Lots'}</span>
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.target.blur()
+                                          }
+                                        }}
+                                        className="bg-white/[0.02] border border-white/5 rounded-lg px-2 py-1 text-xs text-white text-center font-sans font-bold w-[45px] h-[26px] focus:outline-none focus:border-cyan-500/30 focus:bg-white/[0.05] transition duration-200"
+                                      />
+                                      <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider font-sans">
+                                        {(acc.lots || 1) === 1 ? 'Lot' : 'Lots'}
                                       </span>
-                                      <button 
-                                        type="button"
-                                        onClick={async () => {
-                                          const val = (acc.lots || 1) + 1
-                                          try {
-                                            await supabase.from('accounts').update({ lots: val }).eq('id', acc.id)
-                                            setRefreshTrigger(prev => prev + 1)
-                                            showToast(`Lots size increased to ${val} for ${(acc.name || '').split('|')[0]}`, 'success')
-                                          } catch (err) {
-                                            console.error(err)
-                                            showToast("Failed to update lots.", "error")
-                                          }
-                                        }}
-                                        className="w-5 h-5 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-all duration-200 cursor-pointer focus:outline-none active:scale-90"
-                                      >
-                                        +
-                                      </button>
                                     </div>
                                   </div>
                                   <div className="flex flex-col text-right">
@@ -1661,49 +1648,36 @@ export default function App() {
                                     <span>Paused</span>
                                   </div>
                                 </div>
-                                <div className="my-2.5 flex items-center justify-between gap-2">
                                   <div className="flex flex-col gap-1">
                                     <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest font-bold">Execution Size</span>
-                                    <div className="flex items-center bg-white/[0.02] border border-white/5 rounded-lg p-0.5 mt-0.5 w-max select-none">
-                                      <button 
-                                        type="button"
-                                        onClick={async () => {
-                                          const currentLots = acc.lots || 1
-                                          if (currentLots <= 1) return
-                                          const val = currentLots - 1
+                                    <div className="flex items-center gap-1.5 mt-0.5 select-none">
+                                      <input 
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        defaultValue={acc.lots || 1}
+                                        onBlur={async (e) => {
+                                          const val = parseInt(e.target.value) || 1
+                                          if (val < 1) return
                                           try {
                                             await supabase.from('accounts').update({ lots: val }).eq('id', acc.id)
                                             setRefreshTrigger(prev => prev + 1)
-                                            showToast(`Lots size decreased to ${val} for ${(acc.name || '').split('|')[0]}`, 'success')
+                                            showToast(`Lots size set to ${val} for ${(acc.name || '').split('|')[0]}`, 'success')
                                           } catch (err) {
                                             console.error(err)
                                             showToast("Failed to update lots.", "error")
                                           }
                                         }}
-                                        className="w-5 h-5 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-all duration-200 cursor-pointer focus:outline-none active:scale-90"
-                                      >
-                                        -
-                                      </button>
-                                      <span className="text-[10px] font-extrabold text-white font-sans px-2 min-w-[32px] text-center tracking-tight">
-                                        {acc.lots || 1} <span className="text-[7px] text-gray-500 font-semibold font-sans normal-case ml-0.5">{(acc.lots || 1) === 1 ? 'Lot' : 'Lots'}</span>
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.target.blur()
+                                          }
+                                        }}
+                                        className="bg-white/[0.02] border border-white/5 rounded-lg px-2 py-1 text-xs text-white text-center font-sans font-bold w-[45px] h-[26px] focus:outline-none focus:border-cyan-500/30 focus:bg-white/[0.05] transition duration-200"
+                                      />
+                                      <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider font-sans">
+                                        {(acc.lots || 1) === 1 ? 'Lot' : 'Lots'}
                                       </span>
-                                      <button 
-                                        type="button"
-                                        onClick={async () => {
-                                          const val = (acc.lots || 1) + 1
-                                          try {
-                                            await supabase.from('accounts').update({ lots: val }).eq('id', acc.id)
-                                            setRefreshTrigger(prev => prev + 1)
-                                            showToast(`Lots size increased to ${val} for ${(acc.name || '').split('|')[0]}`, 'success')
-                                          } catch (err) {
-                                            console.error(err)
-                                            showToast("Failed to update lots.", "error")
-                                          }
-                                        }}
-                                        className="w-5 h-5 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-all duration-200 cursor-pointer focus:outline-none active:scale-90"
-                                      >
-                                        +
-                                      </button>
                                     </div>
                                   </div>
                                   <div className="flex flex-col text-right">
