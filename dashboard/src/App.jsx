@@ -1449,18 +1449,8 @@ export default function App() {
                                   {acc.env === 'production' ? 'Production (Live)' : 'Testnet (Demo)'}
                                 </span>
                                 <span className="px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                  Bal: ${formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
+                                  Bal: {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
                                 </span>
-                                <span className="px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest border bg-white/5 text-gray-400 border-white/5">
-                                  {accPositions.length} open position(s)
-                                </span>
-                              </div>
-                              
-                              <div className="mt-5 font-mono text-[9px] text-gray-500 font-bold uppercase tracking-wider">
-                                <p>API Sign Key:</p>
-                                <code className="text-[10px] text-cyan-400/80 bg-cyan-950/20 px-2.5 py-1.5 rounded-lg border border-cyan-500/10 inline-block mt-1 font-mono">
-                                  ...{acc.api_key.slice(-12)}
-                                </code>
                               </div>
                             </div>
                             
