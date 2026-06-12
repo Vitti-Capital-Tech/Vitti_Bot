@@ -1548,6 +1548,7 @@ export default function App() {
                                     <span>Active</span>
                                   </div>
                                 </div>
+                                <div className="my-2.5 flex items-center justify-between gap-2">
                                   <div className="flex flex-col gap-1">
                                     <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest font-bold">Execution Size</span>
                                     <div className="flex items-center gap-1.5 mt-0.5 select-none">
@@ -1648,6 +1649,7 @@ export default function App() {
                                     <span>Paused</span>
                                   </div>
                                 </div>
+                                <div className="my-2.5 flex items-center justify-between gap-2">
                                   <div className="flex flex-col gap-1">
                                     <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest font-bold">Execution Size</span>
                                     <div className="flex items-center gap-1.5 mt-0.5 select-none">
