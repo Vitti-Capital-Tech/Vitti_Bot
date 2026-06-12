@@ -796,9 +796,6 @@ export default function App() {
                   <span className="tooltip-content">Simultaneous strangle monitoring at Delta Exchange</span>
                 </div>
               </div>
-              <span className="text-[9px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md font-bold tracking-wider font-sans">
-                {activeStrangleAccountsCount} ACCOUNTS
-              </span>
             </div>
             <h3 className="text-[2rem] font-black mt-4 tracking-tight font-sans leading-none text-white">
               {activePositions.length}
