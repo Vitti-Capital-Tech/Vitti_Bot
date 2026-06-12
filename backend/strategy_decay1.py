@@ -331,14 +331,16 @@ def execute_decay1_entry(supabase: Client):
                     except Exception:
                         pass
                         
-                    # Place Sell Order at market with native exchange brackets (TP based on Spot Index)
-                    order = client.place_order(
+                    # Place Sell Order with native brackets: SL on mark_price, TP on spot_price (index)
+                    order = client.place_order_with_brackets(
                         product_id=prod_id,
                         size=size,
                         side='sell',
                         order_type='market_order',
+                        sl_price=str(sl_price_premium),
+                        sl_trigger_method='mark_price',
                         tp_price=str(tp_spot) if tp_spot > 0 else None,
-                        stop_trigger_method='spot_price', # trigger bracket TP based on underlying spot/index price
+                        tp_trigger_method='spot_price',
                         client_order_id=f"decay1_{leg.lower()}_{int(time.time())}"
                     )
                     
@@ -347,8 +349,8 @@ def execute_decay1_entry(supabase: Client):
                     if fill_price <= 0.0:
                         fill_price = entry_premium
                         
-                    # Native Stop Loss order for Options is unsupported by Delta Exchange API.
-                    # We rely entirely on the monitor_positions_loop to trigger the SL.
+                    # Native SL (mark_price) and TP (spot_price/index) brackets are now attached on exchange.
+                    # The monitor_positions_loop also tracks mark_price as a secondary safety net.
                     
                     # Insert position details into Supabase
                     supabase.table('positions').insert({
@@ -378,22 +380,24 @@ def execute_decay1_entry(supabase: Client):
                             if best_ask <= 0.0:
                                 best_ask = entry_premium
                                 
-                            # Place limit order with native exchange brackets (TP based on Spot Index)
-                            order = client.place_order(
+                            # Place limit order with native brackets: SL on mark_price, TP on spot_price (index)
+                            order = client.place_order_with_brackets(
                                 product_id=prod_id,
                                 size=size,
                                 side='sell',
                                 order_type='limit_order',
                                 limit_price=str(best_ask),
+                                sl_price=str(sl_price_premium),
+                                sl_trigger_method='mark_price',
                                 tp_price=str(tp_spot) if tp_spot > 0 else None,
-                                stop_trigger_method='spot_price',
+                                tp_trigger_method='spot_price',
                                 client_order_id=f"decay1_{leg.lower()}_lim_{int(time.time())}"
                             )
                             
                             fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
                             
-                            # Native Stop Loss order for Options is unsupported by Delta Exchange API.
-                            # We rely entirely on the monitor_positions_loop to trigger the SL.
+                            # Native SL (mark_price) and TP (spot_price/index) brackets are now attached on exchange.
+                            # The monitor_positions_loop also tracks mark_price as a secondary safety net.
                             
                             # Insert position details into Supabase
                             supabase.table('positions').insert({

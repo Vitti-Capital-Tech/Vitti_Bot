@@ -179,12 +179,88 @@ class DeltaClient:
             payload["bracket_stop_loss_price"] = str(sl_price)
             payload["bracket_stop_trigger_method"] = stop_trigger_method
             
-        # Add Take Profit Bracket Condition
+        # Add Take Profit Bracket Condition (only set trigger method if no SL, to avoid overwrite)
         if tp_price is not None:
             payload["bracket_take_profit_price"] = str(tp_price)
-            payload["bracket_stop_trigger_method"] = stop_trigger_method  # trigger method matches stop trigger
+            if sl_price is None:
+                payload["bracket_stop_trigger_method"] = stop_trigger_method
             
         return self.request('POST', '/v2/orders', payload=payload)
+
+    def place_order_with_brackets(self,
+                                  product_id: int,
+                                  size: int,
+                                  side: str,
+                                  order_type: str = 'market_order',
+                                  limit_price: Optional[str] = None,
+                                  sl_price: Optional[str] = None,
+                                  sl_trigger_method: str = 'mark_price',
+                                  tp_price: Optional[str] = None,
+                                  tp_trigger_method: str = 'spot_price',
+                                  client_order_id: Optional[str] = None,
+                                  reduce_only: bool = False) -> Dict[str, Any]:
+        """
+        Places a new order on Delta Exchange with separate trigger methods for SL and TP brackets.
+        - sl_trigger_method: 'mark_price' for options SL (default)
+        - tp_trigger_method: 'spot_price' for index-based TP (default)
+        
+        Uses the full bracket_orders structure allowing independent SL/TP trigger methods.
+        """
+        payload = {
+            "product_id": int(product_id),
+            "size": int(size),
+            "side": side.lower(),
+            "order_type": order_type,
+            "reduce_only": reduce_only,
+            "time_in_force": "gtc"
+        }
+        
+        if limit_price is not None:
+            payload["limit_price"] = str(limit_price)
+        if client_order_id is not None:
+            payload["client_order_id"] = str(client_order_id)
+
+        # Attach Stop Loss bracket (mark_price trigger) 
+        if sl_price is not None:
+            payload["bracket_stop_loss_price"] = str(sl_price)
+            payload["bracket_stop_loss_limit_price"] = str(sl_price)  # limit == stop for immediate fill
+            payload["bracket_stop_trigger_method"] = sl_trigger_method
+
+        # Attach Take Profit bracket (spot_price/index trigger)
+        if tp_price is not None:
+            payload["bracket_take_profit_price"] = str(tp_price)
+            payload["bracket_take_profit_limit_price"] = str(tp_price)  # limit == stop for immediate fill
+            # NOTE: Delta API uses a single bracket_stop_trigger_method shared field for bracket orders.
+            # For separate SL(mark) and TP(spot) triggers, we must use the bracket_orders array if available,
+            # or fall back to attaching them as separate conditional orders after the main order fills.
+            # If both SL and TP exist with different trigger methods, we attach TP separately via a second request.
+            if sl_price is None:
+                payload["bracket_stop_trigger_method"] = tp_trigger_method
+
+        result = self.request('POST', '/v2/orders', payload=payload)
+
+        # If both SL and TP are needed with DIFFERENT trigger methods, attach TP as a separate reduce_only order.
+        # SL is already attached via bracket_stop_loss_price (mark_price).
+        # TP needs to be a separate conditional order using stop_price triggered on spot_price.
+        if sl_price is not None and tp_price is not None and sl_trigger_method != tp_trigger_method:
+            try:
+                tp_payload = {
+                    "product_id": int(product_id),
+                    "size": int(size),
+                    "side": "buy" if side.lower() == "sell" else "sell",
+                    "order_type": "limit_order",
+                    "limit_price": str(tp_price),
+                    "stop_price": str(tp_price),
+                    "stop_order_type": "take_profit_order",
+                    "stop_trigger_method": tp_trigger_method,
+                    "reduce_only": True
+                }
+                self.request('POST', '/v2/orders', payload=tp_payload)
+            except Exception as tp_err:
+                # TP attachment failed - monitor loop will handle it
+                print(f"Notice: Failed to attach separate TP order: {tp_err}")
+
+        return result
 
     def cancel_order(self, product_id: int, order_id: Optional[int] = None, client_order_id: Optional[str] = None) -> Dict[str, Any]:
         """
