@@ -196,23 +196,25 @@ def execute_decay2_entry(supabase: Client):
                     if fill_price <= 0.0:
                         fill_price = entry_premium
                     
-                    # Native Stop Loss order for Options is unsupported by Delta Exchange API.
-                    # We rely entirely on the monitor_positions_loop to trigger the SL.
-                        
-                    # 3. Place Take Profit (Limit Buy order with reduce_only=True at TP premium level)
-                    tp_order_id = None
-                    try:
-                        tp_order = client.request('POST', '/v2/orders', payload={
-                            "product_id": int(prod_id),
-                            "size": int(size),
-                            "side": "buy",
-                            "order_type": "limit_order",
-                            "limit_price": str(tp_premium),
-                            "reduce_only": True
-                        })
-                        tp_order_id = tp_order.get('id')
-                    except Exception as tp_err:
-                        log_trade_event(supabase, name, f"Failed to attach native TP limit order for Decay2 {symbol}: {tp_err}", 'ERROR', 'decay2')
+                    # 2. Attach separate SL + TP stop orders on exchange
+                    bracket_results = client.attach_sl_tp(
+                        product_id=prod_id,
+                        size=size,
+                        sl_price=str(sl_price),
+                        sl_trigger_method='mark_price',
+                        tp_price=str(tp_premium) if tp_premium > 0 else None,
+                        tp_trigger_method='mark_price'
+                    )
+                    if bracket_results.get('sl_error'):
+                        log_trade_event(supabase, name, f"Warning: Failed to attach native SL for {symbol}: {bracket_results['sl_error']}", 'ERROR', 'decay2')
+                    elif bracket_results.get('sl'):
+                        sl_order_id = bracket_results['sl'].get('id', '?')
+                        log_trade_event(supabase, name, f"Native SL attached for {symbol}: Stop at Mark {sl_price} (Order ID: {sl_order_id})", 'INFO', 'decay2')
+                    if bracket_results.get('tp_error'):
+                        log_trade_event(supabase, name, f"Warning: Failed to attach native TP for {symbol}: {bracket_results['tp_error']}", 'ERROR', 'decay2')
+                    elif bracket_results.get('tp'):
+                        tp_order_id = bracket_results['tp'].get('id', '?')
+                        log_trade_event(supabase, name, f"Native TP attached for {symbol}: Stop at Mark {tp_premium} (Order ID: {tp_order_id})", 'INFO', 'decay2')
 
                     # Insert position details into Supabase
                     supabase.table('positions').insert({
@@ -231,7 +233,7 @@ def execute_decay2_entry(supabase: Client):
                         'entry_order_id': order.get('id')
                     }).execute()
                     
-                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Take Profit (Exchange Limit): {tp_premium}", 'TRADE', 'decay2')
+                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Exchange - Mark): {sl_price}. Take Profit (Exchange - Mark): {tp_premium}", 'TRADE', 'decay2')
                     
                 except Exception as e:
                     err_str = str(e)
@@ -254,21 +256,19 @@ def execute_decay2_entry(supabase: Client):
                             
                             fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
                             
-                            # Native Stop Loss order for Options is unsupported by Delta Exchange API.
-                            # We rely entirely on the monitor_positions_loop to trigger the SL.
-                                
-                            # Attach TP Limit
-                            try:
-                                client.request('POST', '/v2/orders', payload={
-                                    "product_id": int(prod_id),
-                                    "size": int(size),
-                                    "side": "buy",
-                                    "order_type": "limit_order",
-                                    "limit_price": str(tp_premium),
-                                    "reduce_only": True
-                                })
-                            except Exception as tp_err:
-                                log_trade_event(supabase, name, f"Failed to attach native TP limit for limit fallback {symbol}: {tp_err}", 'ERROR', 'decay2')
+                            # 2. Attach separate SL + TP stop orders on exchange
+                            bracket_results = client.attach_sl_tp(
+                                product_id=prod_id,
+                                size=size,
+                                sl_price=str(sl_price),
+                                sl_trigger_method='mark_price',
+                                tp_price=str(tp_premium) if tp_premium > 0 else None,
+                                tp_trigger_method='mark_price'
+                            )
+                            if bracket_results.get('sl_error'):
+                                log_trade_event(supabase, name, f"Warning: Failed to attach native SL for {symbol}: {bracket_results['sl_error']}", 'ERROR', 'decay2')
+                            if bracket_results.get('tp_error'):
+                                log_trade_event(supabase, name, f"Warning: Failed to attach native TP for {symbol}: {bracket_results['tp_error']}", 'ERROR', 'decay2')
 
                             supabase.table('positions').insert({
                                 'account_id': acc['id'],
@@ -286,7 +286,7 @@ def execute_decay2_entry(supabase: Client):
                                 'entry_order_id': order.get('id')
                             }).execute()
                             
-                            log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Local): {sl_price}. Take Profit (Exchange Limit): {tp_premium}", 'TRADE', 'decay2')
+                            log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Exchange - Mark): {sl_price}. Take Profit (Exchange - Mark): {tp_premium}", 'TRADE', 'decay2')
                         except Exception as limit_err:
                             log_trade_event(supabase, name, f"Limit order fallback also failed for {symbol}: {limit_err}", 'ERROR', 'decay2')
                     else:
