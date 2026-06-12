@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import { 
   Shield, 
   Activity, 
+  Wallet,
   Settings, 
   Terminal, 
   UserPlus, 
@@ -503,6 +504,17 @@ export default function App() {
   // Calculate Active Strangle accounts
   const activeStrangleAccountsCount = groupedStrangles.filter(g => g.stranglePairs.length > 0 || g.unpaired.length > 0).length
 
+  // Calculate Account metrics
+  const activeAccountsCount = accounts.filter(a => a.is_active).length
+  const totalAccountsCount = accounts.length
+  const totalActiveBalance = accounts
+    .filter(a => a.is_active)
+    .reduce((sum, acc) => {
+      const nameParts = (acc.name || '').split('|')
+      const bal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
+      return sum + bal
+    }, 0.0)
+
   // Determine daemon health status: check if we received logs within last 5 minutes
   const isDaemonHealthy = () => {
     if (logs.length === 0) return false
@@ -725,7 +737,7 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-8 flex flex-col gap-8 z-10">
 
         {/* KPI INSTITUTIONAL METRICS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
 
           {/* Card 1 — Unrealized PnL */}
           <div className="glass-panel kpi-card-cyan rounded-2xl p-6 relative border border-white/5 bg-[#0b0f1d] transition-all duration-300">
@@ -843,6 +855,33 @@ export default function App() {
               )}
             </div>
           </div>
+
+          {/* Card 4 — Trading Accounts Balance */}
+          <div className="glass-panel kpi-card-cyan rounded-2xl p-6 relative border border-white/5 bg-[#0b0f1d] transition-all duration-300">
+            {/* Faint background icon container */}
+            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none select-none">
+              <div className="absolute -right-2 -bottom-2 opacity-[0.025]">
+                <Wallet className="w-32 h-32 text-emerald-400" />
+              </div>
+            </div>
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center">
+                  <Wallet className="w-3 h-3 text-emerald-400" />
+                </div>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Trading Accounts</p>
+              </div>
+              <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-bold tracking-wider font-sans">
+                {activeAccountsCount} / {totalAccountsCount} ACTIVE
+              </span>
+            </div>
+            <div className="mt-4 flex flex-col gap-1">
+              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Total Active Balance</span>
+              <h3 className="text-[1.8rem] font-black tracking-tight font-sans leading-none text-emerald-400 drop-shadow-[0_0_18px_rgba(16,185,129,0.25)]">
+                {formatAmount(totalActiveBalance, 2)}
+              </h3>
+            </div>
+          </div>
         </div>
 
         {/* MAIN CONSOLE PANEL */}
@@ -905,10 +944,10 @@ export default function App() {
                                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                   <span className={`text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md ${
                                     group.env === 'production' 
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.03)]' 
+                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.03)]' 
                                     : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.05)]'
                                   }`}>
-                                    {group.env === 'production' ? 'PROD - REAL FUNDS' : 'SANDBOX TESTNET'}
+                                    {group.env === 'production' ? 'LIVE' : 'DEMO'}
                                   </span>
                                   <span className="text-[8px] font-extrabold uppercase tracking-widest px-2 py-0.5 border rounded-md bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.03)]">
                                     STRATEGY: {(group.strategyName || 'decay1').toUpperCase()}
