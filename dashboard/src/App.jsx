@@ -553,7 +553,8 @@ export default function App() {
       
       const accounts = Object.keys(accountGroups).map(accId => {
         const accPosList = accountGroups[accId]
-        const accName = accPosList[0].accounts?.name || 'Linked Account'
+        const dbName = accPosList[0].accounts?.name || 'Linked Account'
+        const [accName, accBalance] = dbName.split('|')
         const accEnv = accPosList[0].accounts?.env || 'production'
         
         // Group by strategy inside the account
@@ -612,6 +613,7 @@ export default function App() {
         return {
           accountId: accId,
           accountName: accName,
+          accountBalance: accBalance ? parseFloat(accBalance) : null,
           env: accEnv,
           strategies,
           totalAccountPnL
@@ -1242,10 +1244,15 @@ export default function App() {
                                       <span className={`text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded ${
                                         account.env === 'production' 
                                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
-                                        : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.05)]'
+                                        : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
                                       }`}>
-                                        {account.env === 'production' ? 'PROD - REAL FUNDS' : account.env === 'paper' ? 'LIVE PAPER' : 'SANDBOX TESTNET'}
+                                        {account.env === 'production' ? 'Live' : 'Demo'}
                                       </span>
+                                      {account.accountBalance !== null && (
+                                        <span className="text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                          Bal: {formatAmount(account.accountBalance, 2)}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
