@@ -428,12 +428,13 @@ export default function App() {
   }
 
   // Calculate live unrealized PnL summary
-  const totalPnL = positions.reduce((acc, pos) => acc + (parseFloat(pos.pnl) || 0.0), 0.0)
+  const activePositions = positions.filter(p => p.status === 'open')
+  const totalPnL = activePositions.reduce((acc, pos) => acc + (parseFloat(pos.pnl) || 0.0), 0.0)
 
   // Group positions by Account ID + Strategy Name to render consolidated Strangles
   const getGroupedStrangles = () => {
     const groups = {}
-    positions.forEach(pos => {
+    activePositions.forEach(pos => {
       const key = `${pos.account_id}_${pos.strategy_name}`
       if (!groups[key]) {
         groups[key] = []
@@ -765,7 +766,7 @@ export default function App() {
               </span>
             </div>
             <h3 className="text-[2rem] font-black mt-4 tracking-tight font-sans leading-none text-white">
-              {positions.length}
+              {activePositions.length}
               <span className="text-sm font-semibold text-gray-500 ml-1.5">Option Legs</span>
             </h3>
           </div>
@@ -830,7 +831,7 @@ export default function App() {
               ? 'visible opacity-100 translate-y-0 scale-100 pointer-events-auto relative z-10' 
               : 'invisible opacity-0 translate-y-4 scale-[0.98] pointer-events-none absolute inset-x-0 top-0 z-0'
             }`}>
-                {positions.length === 0 ? (
+                {activePositions.length === 0 ? (
                   /* INSTITUTIONAL STANDBY WORKSPACE */
                   <div className="flex flex-col gap-8 items-center py-8">
                     
