@@ -588,6 +588,13 @@ def monitor_positions_loop(supabase: Client):
                     if not is_paper and status == 'open' and exchange_positions is not None and symbol not in active_symbols:
                         print(f"Reconciliation: option {symbol} is closed on Delta Exchange. Updating DB status.")
                         try:
+                            # Cancel all resting orders/brackets (like the TP) to avoid false orders
+                            try:
+                                trading_client.cancel_all_orders(product_id=prod_id)
+                                log_trade_event(supabase, acc['name'], f"Decay1: Cancelled remaining TP/resting orders for {symbol} after exchange exit.", 'INFO', 'decay1')
+                            except Exception as cancel_err:
+                                print(f"Notice: Failed to cancel resting orders for reconciled {symbol}: {cancel_err}")
+
                             supabase.table('positions').update({
                                 'status': 'closed',
                                 'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
