@@ -198,6 +198,9 @@ def execute_decay2_entry(supabase: Client):
                     sl_price = round(fill_price * sl_multiplier, 2)
                     tp_premium = round(fill_price * tgt_mult, 2)
                     
+                    # Wait for position to register on exchange before placing reduce_only orders
+                    time.sleep(1.5)
+                    
                     # 2. Attach separate SL + TP orders on exchange
                     bracket_results = {}
                     if sl_price is not None:
@@ -285,6 +288,9 @@ def execute_decay2_entry(supabase: Client):
                             # Recalculate SL & TP targets based on actual entry fill price
                             sl_price = round(fill_price * sl_multiplier, 2)
                             tp_premium = round(fill_price * tgt_mult, 2)
+                            
+                            # Wait for position to register on exchange before placing reduce_only orders
+                            time.sleep(1.0)
                             
                             # 2. Attach separate SL + TP orders on exchange
                             bracket_results = {}
