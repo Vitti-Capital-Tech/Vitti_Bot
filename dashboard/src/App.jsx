@@ -541,65 +541,86 @@ export default function App() {
     
     return Object.keys(dateGroups).map(dateStr => {
       const datePosList = dateGroups[dateStr]
-      const strangleGroups = {}
+      const accountGroups = {}
       
       datePosList.forEach(pos => {
-        const key = `${pos.account_id}_${pos.strategy_name}`
-        if (!strangleGroups[key]) {
-          strangleGroups[key] = []
+        const accId = pos.account_id
+        if (!accountGroups[accId]) {
+          accountGroups[accId] = []
         }
-        strangleGroups[key].push(pos)
+        accountGroups[accId].push(pos)
       })
       
-      const strangles = Object.keys(strangleGroups).map(groupKey => {
-        const [accId, strategyName] = groupKey.split('_')
-        const accPosList = strangleGroups[groupKey]
-        
+      const accounts = Object.keys(accountGroups).map(accId => {
+        const accPosList = accountGroups[accId]
         const accName = accPosList[0].accounts?.name || 'Linked Account'
         const accEnv = accPosList[0].accounts?.env || 'production'
         
-        const calls = accPosList.filter(p => p.symbol.startsWith('C-'))
-        const puts = accPosList.filter(p => p.symbol.startsWith('P-'))
+        // Group by strategy inside the account
+        const strategyGroups = {}
+        accPosList.forEach(pos => {
+          const strat = pos.strategy_name || 'decay1'
+          if (!strategyGroups[strat]) {
+            strategyGroups[strat] = []
+          }
+          strategyGroups[strat].push(pos)
+        })
         
-        const stranglePairs = []
-        const unpaired = []
-        const usedPuts = new Set()
-        
-        calls.forEach(c => {
-          const cParsed = parseOptionSymbol(c.symbol)
-          const matchingPut = puts.find(p => {
-            if (usedPuts.has(p.id)) return false
-            const pParsed = parseOptionSymbol(p.symbol)
-            return pParsed.expiry === cParsed.expiry
+        const strategies = Object.keys(strategyGroups).map(strategyName => {
+          const stratPosList = strategyGroups[strategyName]
+          const calls = stratPosList.filter(p => p.symbol.startsWith('C-'))
+          const puts = stratPosList.filter(p => p.symbol.startsWith('P-'))
+          
+          const stranglePairs = []
+          const unpaired = []
+          const usedPuts = new Set()
+          
+          calls.forEach(c => {
+            const cParsed = parseOptionSymbol(c.symbol)
+            const matchingPut = puts.find(p => {
+              if (usedPuts.has(p.id)) return false
+              const pParsed = parseOptionSymbol(p.symbol)
+              return pParsed.expiry === cParsed.expiry
+            })
+            
+            if (matchingPut) {
+              stranglePairs.push({ call: c, put: matchingPut })
+              usedPuts.add(matchingPut.id)
+            } else {
+              unpaired.push(c)
+            }
           })
           
-          if (matchingPut) {
-            stranglePairs.push({ call: c, put: matchingPut })
-            usedPuts.add(matchingPut.id)
-          } else {
-            unpaired.push(c)
+          puts.forEach(p => {
+            if (!usedPuts.has(p.id)) {
+              unpaired.push(p)
+            }
+          })
+          
+          const strategyPnL = stratPosList.reduce((acc, p) => acc + (parseFloat(p.pnl) || 0.0), 0.0)
+          
+          return {
+            strategyName,
+            stranglePairs,
+            unpaired,
+            strategyPnL
           }
         })
         
-        puts.forEach(p => {
-          if (!usedPuts.has(p.id)) {
-            unpaired.push(p)
-          }
-        })
+        const totalAccountPnL = accPosList.reduce((acc, p) => acc + (parseFloat(p.pnl) || 0.0), 0.0)
         
         return {
           accountId: accId,
           accountName: accName,
           env: accEnv,
-          strategyName,
-          stranglePairs,
-          unpaired
+          strategies,
+          totalAccountPnL
         }
       })
       
       return {
         dateStr,
-        strangles
+        accounts
       }
     })
   }
@@ -1208,156 +1229,172 @@ export default function App() {
 
                       {/* Strangles executed on this date */}
                       <div className="flex flex-col gap-6">
-                        {dateGroup.strangles.map(group => {
-                          const allGroupPositions = [...group.stranglePairs.flatMap(p => [p.call, p.put]), ...group.unpaired]
-                          const totalGroupPnL = allGroupPositions.reduce((acc, pos) => acc + (parseFloat(pos.pnl) || 0.0), 0.0)
-
+                        {dateGroup.accounts.map(account => {
                           return (
-                            <div key={`${group.accountId}_${group.strategyName}`} className="glass-card rounded-2xl border border-white/5 bg-[#0d1222]/20 p-5 flex flex-col gap-5 shadow-lg relative overflow-hidden">
-                              {/* Group Header */}
+                            <div key={account.accountId} className="glass-card rounded-2xl border border-white/5 bg-[#0d1222]/20 p-5 flex flex-col gap-5 shadow-lg relative overflow-hidden">
+                              {/* Account Header */}
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-3 gap-3">
                                 <div className="flex items-center gap-2.5">
-                                  <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0" />
+                                  <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
                                   <div>
-                                    <h4 className="font-extrabold text-white text-sm tracking-tight">{group.accountName}</h4>
+                                    <h4 className="font-extrabold text-white text-sm tracking-tight">{account.accountName}</h4>
                                     <div className="flex flex-wrap items-center gap-2 mt-1">
                                       <span className={`text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded ${
-                                        group.env === 'production' 
+                                        account.env === 'production' 
                                         ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
                                         : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.05)]'
                                       }`}>
-                                        {group.env === 'production' ? 'PROD - REAL FUNDS' : group.env === 'paper' ? 'LIVE PAPER' : 'SANDBOX TESTNET'}
-                                      </span>
-                                      <span className="text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                        STRATEGY: {(group.strategyName || 'decay1').toUpperCase()}
+                                        {account.env === 'production' ? 'PROD - REAL FUNDS' : account.env === 'paper' ? 'LIVE PAPER' : 'SANDBOX TESTNET'}
                                       </span>
                                     </div>
                                   </div>
                                 </div>
                                 
-                                {/* Group PnL */}
+                                {/* Account Total Yield */}
                                 <div className="text-right self-end sm:self-auto">
-                                  <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider font-sans">Strangle Yield</p>
-                                  <span className={`font-mono text-xs font-black ${totalGroupPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                    {totalGroupPnL >= 0 ? '+' : ''}{formatAmount(totalGroupPnL, 4)}
+                                  <p className="text-[8px] text-gray-500 font-bold uppercase tracking-wider font-sans">Account Total Yield</p>
+                                  <span className={`font-mono text-xs font-black ${account.totalAccountPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {account.totalAccountPnL >= 0 ? '+' : ''}{formatAmount(account.totalAccountPnL, 4)}
                                   </span>
                                 </div>
                               </div>
 
-                              {/* Strangle Legs */}
-                              <div className="flex flex-col gap-4">
-                                {group.stranglePairs.map((pair, idx) => {
-                                  const callEntry = parseFloat(pair.call.entry_price) || 0
-                                  const putEntry = parseFloat(pair.put.entry_price) || 0
-                                  const callExit = parseFloat(pair.call.mark_price) || 0
-                                  const putExit = parseFloat(pair.put.mark_price) || 0
-                                  
-                                  const callPnL = parseFloat(pair.call.pnl) || 0
-                                  const putPnL = parseFloat(pair.put.pnl) || 0
-                                  
+                              {/* Nested Strategy Sections */}
+                              <div className="flex flex-col gap-6 divide-y divide-white/[0.03]">
+                                {account.strategies.map((strat, sIdx) => {
                                   return (
-                                    <div key={idx} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                      {[
-                                        { leg: pair.call, entry: callEntry, exit: callExit, pnl: callPnL, isCall: true },
-                                        { leg: pair.put, entry: putEntry, exit: putExit, pnl: putPnL, isCall: false }
-                                      ].map((l, lIdx) => (
-                                        <div key={lIdx} className="bg-black/10 p-4 rounded-xl border border-white/[0.02] flex flex-col gap-2 relative">
-                                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                            <div className="flex items-center gap-2">
-                                              <span className="font-extrabold text-white text-xs font-mono">{l.leg.symbol}</span>
-                                              <span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-widest border ${
-                                                l.isCall 
-                                                ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
-                                                : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                                              }`}>
-                                                {l.isCall ? 'CALL SHORT' : 'PUT SHORT'}
-                                              </span>
-                                            </div>
-                                            <span className={`font-mono text-xs font-bold ${l.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                              {l.pnl >= 0 ? '+' : ''}{formatAmount(l.pnl, 4)}
-                                            </span>
-                                          </div>
-
-                                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-1 text-[9px] font-mono text-gray-400">
-                                            <div className="flex flex-col">
-                                              <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Entry</span>
-                                              <span className="text-gray-300 font-bold mt-0.5">${l.entry.toFixed(2)}</span>
-                                              <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(l.leg.created_at)}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                              <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Exit</span>
-                                              <span className="text-gray-300 font-bold mt-0.5">${l.exit.toFixed(2)}</span>
-                                              <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(l.leg.closed_at)}</span>
-                                            </div>
-                                            <div className="flex flex-col col-span-2 sm:col-span-1">
-                                              <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Risk / Limits</span>
-                                              <span className="text-rose-400 font-semibold mt-0.5">SL: ${parseFloat(l.leg.sl_price || 0).toFixed(2)}</span>
-                                              <span className="text-emerald-400 font-semibold mt-0.5">
-                                                {l.leg.strategy_name === 'decay2' ? `TP: $${parseFloat(l.leg.tp_price || 0).toFixed(2)}` : `Spot Target: $${parseFloat(l.leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
-                                              </span>
-                                              {l.leg.strategy_name === 'decay1' && l.leg.tp_price > 0 && (
-                                                <span className="text-cyan-400 font-semibold mt-0.5">
-                                                  Entry Spot: ${(l.isCall ? l.leg.tp_price / 0.9925 : l.leg.tp_price / 1.0075).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  );
-                                })}
-
-                                {group.unpaired.map((leg, idx) => {
-                                  const isCall = leg.symbol.startsWith('C-')
-                                  const entryPrice = parseFloat(leg.entry_price) || 0
-                                  const exitPrice = parseFloat(leg.mark_price) || 0
-                                  const legPnL = parseFloat(leg.pnl) || 0
-
-                                  return (
-                                    <div key={idx} className="bg-black/10 p-4 rounded-xl border border-white/[0.02] flex flex-col gap-2 relative">
-                                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-extrabold text-white text-xs font-mono">{leg.symbol}</span>
-                                          <span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-widest border ${
-                                            isCall 
-                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
-                                            : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-                                          }`}>
-                                            {isCall ? 'CALL SHORT' : 'PUT SHORT'}
-                                          </span>
-                                          <span className="px-1.5 py-0.5 rounded text-[7px] font-bold uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                            UNPAIRED
-                                          </span>
-                                        </div>
-                                        <span className={`font-mono text-xs font-bold ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                          {legPnL >= 0 ? '+' : ''}{formatAmount(legPnL, 4)}
+                                    <div key={strat.strategyName} className={`flex flex-col gap-4 ${sIdx > 0 ? 'pt-5' : ''}`}>
+                                      {/* Strategy Header */}
+                                      <div className="flex justify-between items-center bg-white/[0.01] px-3 py-1.5 rounded-lg border border-white/[0.03]">
+                                        <span className="text-[9px] font-extrabold uppercase tracking-widest text-indigo-400 font-sans">
+                                          Strategy: {strat.strategyName.toUpperCase()}
                                         </span>
+                                        <div className="flex items-center gap-1.5 font-mono text-[10px]">
+                                          <span className="text-gray-500 text-[8px] uppercase font-sans font-bold">Yield:</span>
+                                          <span className={`font-bold ${strat.strategyPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            {strat.strategyPnL >= 0 ? '+' : ''}{formatAmount(strat.strategyPnL, 4)}
+                                          </span>
+                                        </div>
                                       </div>
 
-                                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-1 text-[9px] font-mono text-gray-400">
-                                        <div className="flex flex-col">
-                                          <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Entry</span>
-                                          <span className="text-gray-300 font-bold mt-0.5">${entryPrice.toFixed(2)}</span>
-                                          <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(leg.created_at)}</span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                          <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Exit</span>
-                                          <span className="text-gray-300 font-bold mt-0.5">${exitPrice.toFixed(2)}</span>
-                                          <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(leg.closed_at)}</span>
-                                        </div>
-                                        <div className="flex flex-col col-span-2 sm:col-span-1">
-                                          <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Risk / Limits</span>
-                                          <span className="text-rose-400 font-semibold mt-0.5">SL: ${parseFloat(leg.sl_price || 0).toFixed(2)}</span>
-                                          <span className="text-emerald-400 font-semibold mt-0.5">
-                                            {leg.strategy_name === 'decay2' ? `TP: $${parseFloat(leg.tp_price || 0).toFixed(2)}` : `Spot Target: $${parseFloat(leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
-                                          </span>
-                                          {leg.strategy_name === 'decay1' && leg.tp_price > 0 && (
-                                            <span className="text-cyan-400 font-semibold mt-0.5">
-                                              Entry Spot: ${(isCall ? leg.tp_price / 0.9925 : leg.tp_price / 1.0075).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                                            </span>
-                                          )}
-                                        </div>
+                                      {/* Strangle Legs */}
+                                      <div className="flex flex-col gap-4">
+                                        {strat.stranglePairs.map((pair, idx) => {
+                                          const callEntry = parseFloat(pair.call.entry_price) || 0
+                                          const putEntry = parseFloat(pair.put.entry_price) || 0
+                                          const callExit = parseFloat(pair.call.mark_price) || 0
+                                          const putExit = parseFloat(pair.put.mark_price) || 0
+                                          
+                                          const callPnL = parseFloat(pair.call.pnl) || 0
+                                          const putPnL = parseFloat(pair.put.pnl) || 0
+                                          
+                                          return (
+                                            <div key={idx} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                              {[
+                                                { leg: pair.call, entry: callEntry, exit: callExit, pnl: callPnL, isCall: true },
+                                                { leg: pair.put, entry: putEntry, exit: putExit, pnl: putPnL, isCall: false }
+                                              ].map((l, lIdx) => (
+                                                <div key={lIdx} className="bg-black/10 p-4 rounded-xl border border-white/[0.02] flex flex-col gap-2 relative">
+                                                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                                    <div className="flex items-center gap-2">
+                                                      <span className="font-extrabold text-white text-xs font-mono">{l.leg.symbol}</span>
+                                                      <span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-widest border ${
+                                                        l.isCall 
+                                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                                        : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                                                      }`}>
+                                                        {l.isCall ? 'CALL SHORT' : 'PUT SHORT'}
+                                                      </span>
+                                                    </div>
+                                                    <span className={`font-mono text-xs font-bold ${l.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                      {l.pnl >= 0 ? '+' : ''}{formatAmount(l.pnl, 4)}
+                                                    </span>
+                                                  </div>
+
+                                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-1 text-[9px] font-mono text-gray-400">
+                                                    <div className="flex flex-col">
+                                                      <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Entry</span>
+                                                      <span className="text-gray-300 font-bold mt-0.5">${l.entry.toFixed(2)}</span>
+                                                      <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(l.leg.created_at)}</span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                      <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Exit</span>
+                                                      <span className="text-gray-300 font-bold mt-0.5">${l.exit.toFixed(2)}</span>
+                                                      <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(l.leg.closed_at)}</span>
+                                                    </div>
+                                                    <div className="flex flex-col col-span-2 sm:col-span-1">
+                                                      <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Risk / Limits</span>
+                                                      <span className="text-rose-400 font-semibold mt-0.5">SL: ${parseFloat(l.leg.sl_price || 0).toFixed(2)}</span>
+                                                      <span className="text-emerald-400 font-semibold mt-0.5">
+                                                        {l.leg.strategy_name === 'decay2' ? `TP: $${parseFloat(l.leg.tp_price || 0).toFixed(2)}` : `Spot Target: $${parseFloat(l.leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                                                      </span>
+                                                      {l.leg.strategy_name === 'decay1' && l.leg.tp_price > 0 && (
+                                                        <span className="text-cyan-400 font-semibold mt-0.5">
+                                                          Entry Spot: ${(l.isCall ? l.leg.tp_price / 0.9925 : l.leg.tp_price / 1.0075).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )
+                                        })}
+
+                                        {strat.unpaired.map((leg, idx) => {
+                                          const isCall = leg.symbol.startsWith('C-')
+                                          const entryPrice = parseFloat(leg.entry_price) || 0
+                                          const exitPrice = parseFloat(leg.mark_price) || 0
+                                          const legPnL = parseFloat(leg.pnl) || 0
+
+                                          return (
+                                            <div key={idx} className="bg-black/10 p-4 rounded-xl border border-white/[0.02] flex flex-col gap-2 relative">
+                                              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-extrabold text-white text-xs font-mono">{leg.symbol}</span>
+                                                  <span className={`px-1.5 py-0.5 rounded text-[7px] font-bold uppercase tracking-widest border ${
+                                                    isCall 
+                                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                                    : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                                                  }`}>
+                                                    {isCall ? 'CALL SHORT' : 'PUT SHORT'}
+                                                  </span>
+                                                  <span className="px-1.5 py-0.5 rounded text-[7px] font-bold uppercase bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                                    UNPAIRED
+                                                  </span>
+                                                </div>
+                                                <span className={`font-mono text-xs font-bold ${legPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                  {legPnL >= 0 ? '+' : ''}{formatAmount(legPnL, 4)}
+                                                </span>
+                                              </div>
+
+                                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-1 text-[9px] font-mono text-gray-400">
+                                                <div className="flex flex-col">
+                                                  <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Entry</span>
+                                                  <span className="text-gray-300 font-bold mt-0.5">${entryPrice.toFixed(2)}</span>
+                                                  <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(leg.created_at)}</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                  <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Exit</span>
+                                                  <span className="text-gray-300 font-bold mt-0.5">${exitPrice.toFixed(2)}</span>
+                                                  <span className="text-[7px] text-gray-600 mt-0.5">{formatDateTime(leg.closed_at)}</span>
+                                                </div>
+                                                <div className="flex flex-col col-span-2 sm:col-span-1">
+                                                  <span className="text-[8px] text-gray-500 uppercase font-sans tracking-wider">Risk / Limits</span>
+                                                  <span className="text-rose-400 font-semibold mt-0.5">SL: ${parseFloat(leg.sl_price || 0).toFixed(2)}</span>
+                                                  <span className="text-emerald-400 font-semibold mt-0.5">
+                                                    {leg.strategy_name === 'decay2' ? `TP: $${parseFloat(leg.tp_price || 0).toFixed(2)}` : `Spot Target: $${parseFloat(leg.tp_price || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+                                                  </span>
+                                                  {leg.strategy_name === 'decay1' && leg.tp_price > 0 && (
+                                                    <span className="text-cyan-400 font-semibold mt-0.5">
+                                                      Entry Spot: ${(isCall ? leg.tp_price / 0.9925 : leg.tp_price / 1.0075).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          )
+                                        })}
                                       </div>
                                     </div>
                                   )
