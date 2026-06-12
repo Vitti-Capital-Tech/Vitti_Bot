@@ -238,10 +238,9 @@ def execute_decay1_entry(supabase: Client):
             except Exception as e:
                 print(f"Notice: Failed to fetch active positions for pre-entry cleanup: {e}")
             
-        # Sizing logic: load dynamic quantity from environment (default to 1 lot)
-        trade_qty_env = os.getenv("TRADE_QTY", "1")
+        # Sizing logic: load dynamic quantity from account's 'lots' field, fallback to environment, then default to 1
         try:
-            size = int(float(trade_qty_env))
+            size = int(acc.get('lots') or os.getenv("TRADE_QTY", "1"))
         except Exception:
             size = 1
         
