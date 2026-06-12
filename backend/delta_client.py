@@ -279,17 +279,19 @@ class DeltaClient:
         """
         results = {}
 
-        # Attach Stop Loss: triggered on mark_price (Stop-Market order)
+        # Attach Stop Loss: triggered on mark_price
         if sl_price is not None:
             sl_payload = {
                 "product_id": int(product_id),
                 "size": int(size),
                 "side": "buy",   # closing a short position
-                "order_type": "market_order",
+                "order_type": "limit_order",
+                "limit_price": str(sl_price),
                 "stop_price": str(sl_price),
                 "stop_order_type": "stop_loss_order",
                 "stop_trigger_method": sl_trigger_method,
-                "reduce_only": True
+                "reduce_only": True,
+                "time_in_force": "gtc"
             }
             try:
                 results['sl'] = self.request('POST', '/v2/orders', payload=sl_payload)
