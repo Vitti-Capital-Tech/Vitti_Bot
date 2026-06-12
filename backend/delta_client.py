@@ -349,9 +349,31 @@ class DeltaClient:
 
     def cancel_all_orders(self, product_id: Optional[int] = None) -> Dict[str, Any]:
         """
-        Cancels all open orders (including conditional bracket orders).
+        Cancels all open orders and any pending conditional/stop orders.
         """
         payload = {}
         if product_id is not None:
             payload["product_id"] = int(product_id)
-        return self.request('DELETE', '/v2/orders/all', payload=payload)
+        
+        # 1. Cancel standard open orders
+        res = self.request('DELETE', '/v2/orders/all', payload=payload)
+        
+        # 2. Cancel pending stop/conditional orders (like TP and SL)
+        try:
+            query_params = {"state": "pending"}
+            if product_id is not None:
+                query_params["product_id"] = int(product_id)
+            pending_orders = self.request('GET', '/v2/orders', query_params=query_params)
+            if isinstance(pending_orders, list):
+                for o in pending_orders:
+                    o_id = o.get('id')
+                    o_prod_id = o.get('product_id')
+                    if o_id and o_prod_id:
+                        try:
+                            self.cancel_order(product_id=int(o_prod_id), order_id=int(o_id))
+                        except Exception as e:
+                            print(f"Notice: Failed to cancel individual pending order {o_id}: {e}")
+        except Exception as e:
+            print(f"Notice: Failed to clear pending conditional orders list: {e}")
+            
+        return res
