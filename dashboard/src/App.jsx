@@ -1420,38 +1420,40 @@ export default function App() {
                             Active Trading Accounts ({accounts.filter(a => a.is_active).length})
                           </h3>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                           {accounts.filter(a => a.is_active).map(acc => {
                             return (
-                              <div key={acc.id} className="glass-card rounded-xl p-4 flex flex-col justify-between border border-white/5 hover:border-cyan-500/10 transition-all duration-300 relative overflow-hidden">
+                              <div key={acc.id} className="glass-card rounded-xl p-4 flex flex-col justify-between border border-white/5 hover:border-cyan-500/10 transition-all duration-300 relative overflow-hidden min-h-[135px]">
                                 <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
                                   acc.env === 'production' 
                                   ? 'from-amber-400 to-amber-600' 
                                   : 'from-cyan-400 to-indigo-500'
                                 }`}></div>
-                                <div className="flex justify-between items-center">
-                                  <div className="flex-1 min-w-0 pr-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <h4 className="font-extrabold text-white text-sm tracking-tight leading-none truncate">{(acc.name || '').split('|')[0]}</h4>
-                                      <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest font-sans shrink-0">
-                                        <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
-                                        <span>Active</span>
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-1 mt-1.5 flex-wrap">
-                                      <span className={`px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest border ${
-                                        acc.env === 'production' 
-                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
-                                        : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
-                                      }`}>
-                                        {acc.env === 'production' ? 'Live' : 'Demo'}
-                                      </span>
-                                      <span className="px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                        Bal: {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
-                                      </span>
-                                    </div>
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="min-w-0">
+                                    <h4 className="font-extrabold text-white text-sm tracking-tight truncate">{(acc.name || '').split('|')[0]}</h4>
+                                    <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest border ${
+                                      acc.env === 'production' 
+                                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                      : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                                    }`}>
+                                      {acc.env === 'production' ? 'Live' : 'Demo'}
+                                    </span>
                                   </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
+                                  <div className="flex items-center gap-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest font-sans shrink-0">
+                                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                                    <span>Active</span>
+                                  </div>
+                                </div>
+                                <div className="my-3 flex flex-col">
+                                  <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Available Balance</span>
+                                  <span className="text-white font-mono text-base font-extrabold mt-0.5">
+                                    {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
+                                  <span className="text-[7px] text-gray-500 font-mono">Delta India</span>
+                                  <div className="flex items-center gap-1.5">
                                     <button 
                                       onClick={() => handleToggleAccount(acc.id, acc.is_active)}
                                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[9px] font-extrabold uppercase tracking-wider transition-all duration-300 focus:outline-none focus:ring-0 bg-rose-500/15 border-rose-500/25 text-rose-400 hover:bg-rose-600 hover:text-white hover:border-rose-600"
@@ -1485,38 +1487,40 @@ export default function App() {
                             Paused Trading Accounts ({accounts.filter(a => !a.is_active).length})
                           </h3>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                           {accounts.filter(a => !a.is_active).map(acc => {
                             return (
-                              <div key={acc.id} className="glass-card rounded-xl p-4 flex flex-col justify-between border border-white/5 hover:border-cyan-500/10 transition-all duration-300 relative overflow-hidden opacity-75 hover:opacity-100">
+                              <div key={acc.id} className="glass-card rounded-xl p-4 flex flex-col justify-between border border-white/5 hover:border-cyan-500/10 transition-all duration-300 relative overflow-hidden opacity-75 hover:opacity-100 min-h-[135px]">
                                 <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
                                   acc.env === 'production' 
                                   ? 'from-amber-400 to-amber-600' 
                                   : 'from-cyan-400 to-indigo-500'
                                 }`}></div>
-                                <div className="flex justify-between items-center">
-                                  <div className="flex-1 min-w-0 pr-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <h4 className="font-extrabold text-white text-sm tracking-tight leading-none truncate">{(acc.name || '').split('|')[0]}</h4>
-                                      <div className="flex items-center gap-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest font-sans shrink-0">
-                                        <span className="w-1 h-1 rounded-full bg-rose-400" />
-                                        <span>Paused</span>
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-1 mt-1.5 flex-wrap">
-                                      <span className={`px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest border ${
-                                        acc.env === 'production' 
-                                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
-                                        : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
-                                      }`}>
-                                        {acc.env === 'production' ? 'Live' : 'Demo'}
-                                      </span>
-                                      <span className="px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                        Bal: {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
-                                      </span>
-                                    </div>
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="min-w-0">
+                                    <h4 className="font-extrabold text-white text-sm tracking-tight truncate">{(acc.name || '').split('|')[0]}</h4>
+                                    <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest border ${
+                                      acc.env === 'production' 
+                                      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                      : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+                                    }`}>
+                                      {acc.env === 'production' ? 'Live' : 'Demo'}
+                                    </span>
                                   </div>
-                                  <div className="flex items-center gap-1.5 shrink-0">
+                                  <div className="flex items-center gap-1 bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase tracking-widest font-sans shrink-0">
+                                    <span className="w-1 h-1 rounded-full bg-rose-400" />
+                                    <span>Paused</span>
+                                  </div>
+                                </div>
+                                <div className="my-3 flex flex-col">
+                                  <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Available Balance</span>
+                                  <span className="text-white font-mono text-base font-extrabold mt-0.5">
+                                    {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
+                                  <span className="text-[7px] text-gray-500 font-mono">Delta India</span>
+                                  <div className="flex items-center gap-1.5">
                                     <button 
                                       onClick={() => handleToggleAccount(acc.id, acc.is_active)}
                                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[9px] font-extrabold uppercase tracking-wider transition-all duration-300 focus:outline-none focus:ring-0 bg-emerald-500/15 border-emerald-500/25 text-emerald-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-600"
