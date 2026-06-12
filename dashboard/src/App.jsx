@@ -481,9 +481,14 @@ export default function App() {
         }
       })
 
+      const nameParts = (accDetails.name || '').split('|')
+      const baseName = nameParts[0]
+      const actualBalance = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
+
       return {
         accountId: accId,
-        accountName: accDetails.name,
+        accountName: baseName,
+        accountBalance: actualBalance,
         env: accDetails.env,
         strategyName,
         stranglePairs,
@@ -955,7 +960,7 @@ export default function App() {
                                   <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Account Balance</p>
                                     <p className="text-sm md:text-base font-black text-white mt-1 font-mono">
-                                      {formatAmount(10000 + pairPnL, 2)}
+                                      {formatAmount(group.accountBalance + pairPnL, 2)}
                                     </p>
                                   </div>
                                 </div>
@@ -1138,7 +1143,7 @@ export default function App() {
                                         </div>
                                         <div className="flex flex-col">
                                           <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Account Balance</span>
-                                          <span className="text-white text-xs mt-1 font-bold font-mono">{formatAmount(10000 + legPnL, 2)}</span>
+                                          <span className="text-white text-xs mt-1 font-bold font-mono">{formatAmount(group.accountBalance + legPnL, 2)}</span>
                                         </div>
                                       </div>
                                     </div>
@@ -1421,7 +1426,7 @@ export default function App() {
                            <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <div className="flex items-center gap-2.5 flex-wrap">
-                                <h4 className="font-extrabold text-white text-lg tracking-tight leading-none">{acc.name}</h4>
+                                <h4 className="font-extrabold text-white text-lg tracking-tight leading-none">{(acc.name || '').split('|')[0]}</h4>
                                 {acc.is_active ? (
                                   <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest font-sans shrink-0">
                                     <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
@@ -1441,6 +1446,9 @@ export default function App() {
                                   : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(6,182,212,0.05)]'
                                 }`}>
                                   {acc.env === 'production' ? 'Production (Live)' : 'Testnet (Demo)'}
+                                </span>
+                                <span className="px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                  Bal: ${formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
                                 </span>
                                 <span className="px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-widest border bg-white/5 text-gray-400 border-white/5">
                                   {accPositions.length} open position(s)

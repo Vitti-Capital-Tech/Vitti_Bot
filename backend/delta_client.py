@@ -41,7 +41,7 @@ class DeltaClient:
         url = f"{self.base_url}{path}"
         method = method.upper()
         
-        # Format Query String (must start with ? if parameters exist)
+        # Format Query String (must start with ? if parameters exist for signature & URL)
         query_string = ''
         if query_params:
             # Sort keys to ensure deterministic query string generation for signing
@@ -67,16 +67,19 @@ class DeltaClient:
             'Accept': 'application/json'
         }
         
+        # Construct full URL with query string
+        full_url = f"{url}{query_string}"
+        
         # Make the request
         try:
             if method == 'GET':
-                response = requests.get(url, params=query_params, headers=headers, timeout=10)
+                response = requests.get(full_url, headers=headers, timeout=10)
             elif method == 'POST':
-                response = requests.post(url, data=payload_str, params=query_params, headers=headers, timeout=10)
+                response = requests.post(full_url, data=payload_str, headers=headers, timeout=10)
             elif method == 'PUT':
-                response = requests.put(url, data=payload_str, params=query_params, headers=headers, timeout=10)
+                response = requests.put(full_url, data=payload_str, headers=headers, timeout=10)
             elif method == 'DELETE':
-                response = requests.delete(url, data=payload_str, params=query_params, headers=headers, timeout=10)
+                response = requests.delete(full_url, data=payload_str, headers=headers, timeout=10)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
         except requests.exceptions.RequestException as e:
@@ -228,14 +231,12 @@ class DeltaClient:
 
         # Attach Take Profit bracket (spot_price/index trigger)
         if tp_price is not None:
-            payload["bracket_take_profit_price"] = str(tp_price)
-            payload["bracket_take_profit_limit_price"] = str(tp_price)  # limit == stop for immediate fill
-            # NOTE: Delta API uses a single bracket_stop_trigger_method shared field for bracket orders.
-            # For separate SL(mark) and TP(spot) triggers, we must use the bracket_orders array if available,
-            # or fall back to attaching them as separate conditional orders after the main order fills.
-            # If both SL and TP exist with different trigger methods, we attach TP separately via a second request.
-            if sl_price is None:
-                payload["bracket_stop_trigger_method"] = tp_trigger_method
+            # Only attach TP natively if trigger methods are identical or SL is not present
+            if sl_price is None or sl_trigger_method == tp_trigger_method:
+                payload["bracket_take_profit_price"] = str(tp_price)
+                payload["bracket_take_profit_limit_price"] = str(tp_price)  # limit == stop for immediate fill
+                if sl_price is None:
+                    payload["bracket_stop_trigger_method"] = tp_trigger_method
 
         result = self.request('POST', '/v2/orders', payload=payload)
 
@@ -262,6 +263,61 @@ class DeltaClient:
 
         return result
 
+    def attach_sl_tp(self,
+                     product_id: int,
+                     size: int,
+                     sl_price: Optional[str] = None,
+                     sl_trigger_method: str = 'mark_price',
+                     tp_price: Optional[str] = None,
+                     tp_trigger_method: str = 'spot_price') -> Dict[str, Any]:
+        """
+        Attaches Stop Loss and/or Take Profit as separate conditional orders
+        after a position has been filled. This is the only reliable way to have
+        SL triggered on mark_price and TP triggered on spot_price (index) independently.
+
+        Call this right after place_order() once the main order fills.
+        """
+        results = {}
+
+        # Attach Stop Loss: triggered on mark_price
+        if sl_price is not None:
+            sl_payload = {
+                "product_id": int(product_id),
+                "size": int(size),
+                "side": "buy",   # closing a short position
+                "order_type": "limit_order",
+                "limit_price": str(sl_price),
+                "stop_price": str(sl_price),
+                "stop_order_type": "stop_loss_order",
+                "stop_trigger_method": sl_trigger_method,
+                "reduce_only": True,
+                "time_in_force": "gtc"
+            }
+            try:
+                results['sl'] = self.request('POST', '/v2/orders', payload=sl_payload)
+            except Exception as e:
+                results['sl_error'] = str(e)
+
+        # Attach Take Profit: triggered on spot_price (index)
+        if tp_price is not None:
+            tp_payload = {
+                "product_id": int(product_id),
+                "size": int(size),
+                "side": "buy",   # closing a short position
+                "order_type": "limit_order",
+                "limit_price": str(tp_price),
+                "stop_price": str(tp_price),
+                "stop_order_type": "take_profit_order",
+                "stop_trigger_method": tp_trigger_method,
+                "reduce_only": True,
+                "time_in_force": "gtc"
+            }
+            try:
+                results['tp'] = self.request('POST', '/v2/orders', payload=tp_payload)
+            except Exception as e:
+                results['tp_error'] = str(e)
+
+        return results
     def cancel_order(self, product_id: int, order_id: Optional[int] = None, client_order_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Cancels a pending/resting order.

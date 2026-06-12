@@ -231,7 +231,7 @@ def execute_decay2_entry(supabase: Client):
                         'entry_order_id': order.get('id')
                     }).execute()
                     
-                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Exchange - Mark): {sl_price}. Take Profit (Exchange Limit): {tp_premium}", 'TRADE', 'decay2')
+                    log_trade_event(supabase, name, f"Placed {leg} Short: {symbol} size {size} at {fill_price}. Stop Loss (Local): {sl_price}. Take Profit (Exchange Limit): {tp_premium}", 'TRADE', 'decay2')
                     
                 except Exception as e:
                     err_str = str(e)
@@ -286,7 +286,7 @@ def execute_decay2_entry(supabase: Client):
                                 'entry_order_id': order.get('id')
                             }).execute()
                             
-                            log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Local): {sl_price}. Take Profit (Local): {tp_premium}", 'TRADE', 'decay2')
+                            log_trade_event(supabase, name, f"Placed Limit {leg} Short: {symbol} size {size} at {fill_price} (Limit). Stop Loss (Local): {sl_price}. Take Profit (Exchange Limit): {tp_premium}", 'TRADE', 'decay2')
                         except Exception as limit_err:
                             log_trade_event(supabase, name, f"Limit order fallback also failed for {symbol}: {limit_err}", 'ERROR', 'decay2')
                     else:

@@ -18,6 +18,64 @@ from strategy_decay2 import (
     monitor_positions_loop_decay2
 )
 
+def balance_update_loop(supabase: Client):
+    """
+    Periodically fetches account balances from Delta Exchange and updates
+    the 'name' column in Supabase with the format: 'BaseName|Balance'.
+    """
+    from delta_client import DeltaClient
+    import time
+    print("Starting background balance monitor thread...")
+    while True:
+        try:
+            # Fetch all accounts (active or inactive, so we update all linked accounts)
+            accounts_res = supabase.table('accounts').select('*').execute()
+            if not accounts_res.data:
+                time.sleep(30)
+                continue
+                
+            for acc in accounts_res.data:
+                name = acc['name']
+                # Get base name by stripping any existing balance suffix
+                base_name = name.split('|')[0]
+                
+                balance = 0.0
+                is_paper = (acc['env'] == 'paper')
+                
+                if is_paper:
+                    balance = 10000.0  # Paper starting capital
+                else:
+                    client_env = 'production' if acc['env'] == 'paper' else acc['env']
+                    client = DeltaClient(acc['api_key'], acc['api_secret'], client_env)
+                    try:
+                        balances = client.get_balances()
+                        # Find USD balance
+                        usd_bal = None
+                        for b in balances:
+                            if b.get('asset_symbol') == 'USD':
+                                usd_bal = float(b.get('balance', 0.0))
+                                break
+                        if usd_bal is not None:
+                            balance = usd_bal
+                        elif balances:
+                            balance = float(balances[0].get('balance', 0.0))
+                    except Exception as e:
+                        print(f"Error fetching balance for {base_name}: {e}")
+                        continue  # Skip updating if API call failed
+                
+                # Format new name
+                new_name = f"{base_name}|{balance:.2f}"
+                if new_name != name:
+                    try:
+                        supabase.table('accounts').update({'name': new_name}).eq('id', acc['id']).execute()
+                    except Exception as e:
+                        print(f"Error updating name with balance for {base_name}: {e}")
+                        
+        except Exception as e:
+            print(f"Error in balance update loop: {e}")
+            
+        time.sleep(30)
+
 def main():
     print("==========================================")
     print("  DeltaTrade Automated Execution Service  ")
@@ -55,6 +113,15 @@ def main():
     )
     monitor_thread_d2.start()
     print("Started Decay2 position monitor thread.")
+
+    # Start Balance Update thread
+    balance_thread = threading.Thread(
+        target=balance_update_loop,
+        args=(supabase,),
+        daemon=True
+    )
+    balance_thread.start()
+    print("Started background account balance synchronizer thread.")
 
     # 3. Configure APScheduler with India Standard Time
     tz = timezone(config.TIMEZONE)
