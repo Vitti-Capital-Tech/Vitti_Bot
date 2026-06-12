@@ -157,7 +157,7 @@ class DeltaClient:
                     sl_price: Optional[str] = None, 
                     tp_price: Optional[str] = None, 
                     client_order_id: Optional[str] = None,
-                    stop_trigger_method: str = 'last_traded_price',
+                    stop_trigger_method: str = 'mark_price',
                     reduce_only: bool = False) -> Dict[str, Any]:
         """
         Places a new order on Delta Exchange.
@@ -226,7 +226,6 @@ class DeltaClient:
         # Attach Stop Loss bracket (mark_price trigger) 
         if sl_price is not None:
             payload["bracket_stop_loss_price"] = str(sl_price)
-            payload["bracket_stop_loss_limit_price"] = str(sl_price)  # limit == stop for immediate fill
             payload["bracket_stop_trigger_method"] = sl_trigger_method
 
         # Attach Take Profit bracket (spot_price/index trigger)
@@ -234,7 +233,6 @@ class DeltaClient:
             # Only attach TP natively if trigger methods are identical or SL is not present
             if sl_price is None or sl_trigger_method == tp_trigger_method:
                 payload["bracket_take_profit_price"] = str(tp_price)
-                payload["bracket_take_profit_limit_price"] = str(tp_price)  # limit == stop for immediate fill
                 if sl_price is None:
                     payload["bracket_stop_trigger_method"] = tp_trigger_method
 
@@ -249,8 +247,7 @@ class DeltaClient:
                     "product_id": int(product_id),
                     "size": int(size),
                     "side": "buy" if side.lower() == "sell" else "sell",
-                    "order_type": "limit_order",
-                    "limit_price": str(tp_price),
+                    "order_type": "market_order",
                     "stop_price": str(tp_price),
                     "stop_order_type": "take_profit_order",
                     "stop_trigger_method": tp_trigger_method,
@@ -285,13 +282,11 @@ class DeltaClient:
                 "product_id": int(product_id),
                 "size": int(size),
                 "side": "buy",   # closing a short position
-                "order_type": "limit_order",
-                "limit_price": str(sl_price),
+                "order_type": "market_order",
                 "stop_price": str(sl_price),
                 "stop_order_type": "stop_loss_order",
                 "stop_trigger_method": sl_trigger_method,
-                "reduce_only": True,
-                "time_in_force": "gtc"
+                "reduce_only": True
             }
             try:
                 results['sl'] = self.request('POST', '/v2/orders', payload=sl_payload)
@@ -304,13 +299,11 @@ class DeltaClient:
                 "product_id": int(product_id),
                 "size": int(size),
                 "side": "buy",   # closing a short position
-                "order_type": "limit_order",
-                "limit_price": str(tp_price),
+                "order_type": "market_order",
                 "stop_price": str(tp_price),
                 "stop_order_type": "take_profit_order",
                 "stop_trigger_method": tp_trigger_method,
-                "reduce_only": True,
-                "time_in_force": "gtc"
+                "reduce_only": True
             }
             try:
                 results['tp'] = self.request('POST', '/v2/orders', payload=tp_payload)
