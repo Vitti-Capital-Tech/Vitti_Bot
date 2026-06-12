@@ -875,11 +875,39 @@ export default function App() {
                 {activeAccountsCount} / {totalAccountsCount} ACTIVE
               </span>
             </div>
-            <div className="mt-4 flex flex-col gap-1">
-              <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Total Active Balance</span>
-              <h3 className="text-[1.8rem] font-black tracking-tight font-sans leading-none text-emerald-400 drop-shadow-[0_0_18px_rgba(16,185,129,0.25)]">
-                {formatAmount(totalActiveBalance, 2)}
-              </h3>
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest font-sans">Total Active Balance</span>
+                <h3 className="text-xl font-black tracking-tight font-sans leading-none text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.25)]">
+                  {formatAmount(totalActiveBalance, 2)}
+                </h3>
+              </div>
+              <div className="flex flex-col gap-2 border-t border-white/[0.03] pt-3">
+                {accounts.map(acc => {
+                  const nameParts = (acc.name || '').split('|')
+                  const baseName = nameParts[0]
+                  const bal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
+                  return (
+                    <div key={acc.id} className="flex items-center justify-between border-b border-white/[0.02] last:border-0 pb-2 last:pb-0">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white font-sans uppercase tracking-wide flex items-center gap-1.5 truncate">
+                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${acc.is_active ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                          <span className="truncate">{baseName}</span>
+                          <span className="text-[9px] font-mono text-gray-500 shrink-0">({formatAmount(bal, 2)})</span>
+                        </p>
+                      </div>
+                      <span className={`text-[8px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded border shrink-0 ${
+                        acc.is_active
+                        ? 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15'
+                        : 'text-rose-400 bg-rose-500/8 border-rose-500/15'
+                      }`}>{acc.is_active ? 'On' : 'Off'}</span>
+                    </div>
+                  )
+                })}
+                {accounts.length === 0 && (
+                  <p className="text-xs text-gray-600 mt-1">Loading accounts...</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
