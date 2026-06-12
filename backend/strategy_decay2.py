@@ -142,11 +142,11 @@ def execute_decay2_entry(supabase: Client):
             # Fetch current mark price for the option at entry
             mark_price_at_entry = contract['mark_price'] if contract['mark_price'] > 0 else (contract['best_bid'] if contract['best_bid'] > 0 else 50.0)
             
-            # Calculate SL Trigger Premium (2.0x for short strangle decay2)
-            sl_price = round(mark_price_at_entry * sl_multiplier, 2)
+            # Calculate SL Trigger Premium (2.0x for short strangle decay2) using entry_premium as a baseline
+            sl_price = round(entry_premium * sl_multiplier, 2)
             
-            # Calculate TP Trigger Premium (0.20x for short strangle decay2)
-            tp_premium = round(mark_price_at_entry * tgt_mult, 2)
+            # Calculate TP Trigger Premium (0.20x for short strangle decay2) using entry_premium as a baseline
+            tp_premium = round(entry_premium * tgt_mult, 2)
             
             if is_paper:
                 # Simulated paper execution for Decay2
@@ -194,6 +194,10 @@ def execute_decay2_entry(supabase: Client):
                     if fill_price <= 0.0:
                         fill_price = entry_premium
                     
+                    # Recalculate SL & TP targets based on actual entry fill price
+                    sl_price = round(fill_price * sl_multiplier, 2)
+                    tp_premium = round(fill_price * tgt_mult, 2)
+                    
                     # 2. Attach separate SL + TP orders on exchange
                     bracket_results = {}
                     if sl_price is not None:
@@ -205,7 +209,7 @@ def execute_decay2_entry(supabase: Client):
                             "limit_price": str(sl_price),
                             "stop_price": str(sl_price),
                             "stop_order_type": "stop_loss_order",
-                            "stop_trigger_method": "mark_price",
+                            "stop_trigger_method": "last_traded_price",
                             "reduce_only": True
                         }
                         try:
@@ -278,6 +282,10 @@ def execute_decay2_entry(supabase: Client):
                             
                             fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
                             
+                            # Recalculate SL & TP targets based on actual entry fill price
+                            sl_price = round(fill_price * sl_multiplier, 2)
+                            tp_premium = round(fill_price * tgt_mult, 2)
+                            
                             # 2. Attach separate SL + TP orders on exchange
                             bracket_results = {}
                             if sl_price is not None:
@@ -289,7 +297,7 @@ def execute_decay2_entry(supabase: Client):
                                     "limit_price": str(sl_price),
                                     "stop_price": str(sl_price),
                                     "stop_order_type": "stop_loss_order",
-                                    "stop_trigger_method": "mark_price",
+                                    "stop_trigger_method": "last_traded_price",
                                     "reduce_only": True
                                 }
                                 try:

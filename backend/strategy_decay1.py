@@ -283,8 +283,8 @@ def execute_decay1_entry(supabase: Client):
             # Fetch current mark price for the option at entry
             mark_price_at_entry = contract['mark_price'] if contract['mark_price'] > 0 else (contract['best_bid'] if contract['best_bid'] > 0 else 50.0)
             
-            # Calculate premium SL trigger (1.4x option mark price at entry)
-            sl_price_premium = round(mark_price_at_entry * sl_multiplier, 2)
+            # Calculate premium SL trigger using entry_premium as a baseline
+            sl_price_premium = round(entry_premium * sl_multiplier, 2)
 
             # Calculate Target Underlying Spot Price (TP: 0.75% move, SL: 1.50% move)
             # Short Call: Profit if BTC drops (TP), Loss if BTC rises (SL)
@@ -341,12 +341,15 @@ def execute_decay1_entry(supabase: Client):
                     if fill_price <= 0.0:
                         fill_price = entry_premium
 
+                    # Recalculate premium SL trigger based on actual entry fill price
+                    sl_price_premium = round(fill_price * sl_multiplier, 2)
+
                     # 2. Attach SL (mark_price trigger) + TP (spot_price/index trigger) as separate conditional orders
                     bracket_results = client.attach_sl_tp(
                         product_id=prod_id,
                         size=size,
                         sl_price=str(sl_price_premium),
-                        sl_trigger_method='mark_price',
+                        sl_trigger_method='last_traded_price',
                         tp_price=str(tp_spot) if tp_spot > 0 else None,
                         tp_trigger_method='spot_price'
                     )
@@ -401,12 +404,15 @@ def execute_decay1_entry(supabase: Client):
                             
                             fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
 
+                            # Recalculate premium SL trigger based on actual entry fill price
+                            sl_price_premium = round(fill_price * sl_multiplier, 2)
+
                             # 2. Attach SL (mark_price) + TP (spot_price/index) as separate conditional orders
                             bracket_results = client.attach_sl_tp(
                                 product_id=prod_id,
                                 size=size,
                                 sl_price=str(sl_price_premium),
-                                sl_trigger_method='mark_price',
+                                sl_trigger_method='last_traded_price',
                                 tp_price=str(tp_spot) if tp_spot > 0 else None,
                                 tp_trigger_method='spot_price'
                             )
