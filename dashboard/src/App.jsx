@@ -108,6 +108,7 @@ export default function App() {
   const [accKey, setAccKey] = useState('')
   const [accSecret, setAccSecret] = useState('')
   const [accEnv, setAccEnv] = useState('testnet')
+  const [accLots, setAccLots] = useState(1)
   
   // Refresh data trigger
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -292,12 +293,14 @@ export default function App() {
         api_key: accKey,
         api_secret: accSecret,
         env: accEnv,
+        lots: parseInt(accLots) || 1,
         is_active: true
       })
       setShowAddAccountModal(false)
       setAccName('')
       setAccKey('')
       setAccSecret('')
+      setAccLots(1)
       setRefreshTrigger(prev => prev + 1)
       showToast("New trading account linked successfully.", 'success')
     } catch (err) {
@@ -1545,11 +1548,32 @@ export default function App() {
                                     <span>Active</span>
                                   </div>
                                 </div>
-                                <div className="my-3 flex flex-col">
-                                  <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Available Balance</span>
-                                  <span className="text-white font-mono text-base font-extrabold mt-0.5">
-                                    {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
-                                  </span>
+                                <div className="my-2.5 flex items-center justify-between gap-2">
+                                  <div className="flex flex-col">
+                                    <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Lots</span>
+                                    <input 
+                                      type="number"
+                                      min="1"
+                                      defaultValue={acc.lots || 1}
+                                      onChange={async (e) => {
+                                        const val = parseInt(e.target.value) || 1
+                                        try {
+                                          await supabase.from('accounts').update({ lots: val }).eq('id', acc.id)
+                                          showToast(`Updated lots size to ${val} for ${(acc.name || '').split('|')[0]}`, 'success')
+                                        } catch (err) {
+                                          console.error(err)
+                                          showToast("Failed to update lots size.", "error")
+                                        }
+                                      }}
+                                      className="bg-[#05070e] border border-white/10 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-cyan-500 transition duration-200 font-sans font-semibold mt-0.5 w-[50px] h-[22px]"
+                                    />
+                                  </div>
+                                  <div className="flex flex-col text-right">
+                                    <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Available Balance</span>
+                                    <span className="text-white font-mono text-sm font-extrabold mt-0.5">
+                                      {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
                                   <span className="text-[7px] text-gray-500 font-mono">Delta India</span>
@@ -1612,11 +1636,32 @@ export default function App() {
                                     <span>Paused</span>
                                   </div>
                                 </div>
-                                <div className="my-3 flex flex-col">
-                                  <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Available Balance</span>
-                                  <span className="text-white font-mono text-base font-extrabold mt-0.5">
-                                    {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
-                                  </span>
+                                <div className="my-2.5 flex items-center justify-between gap-2">
+                                  <div className="flex flex-col">
+                                    <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Lots</span>
+                                    <input 
+                                      type="number"
+                                      min="1"
+                                      defaultValue={acc.lots || 1}
+                                      onChange={async (e) => {
+                                        const val = parseInt(e.target.value) || 1
+                                        try {
+                                          await supabase.from('accounts').update({ lots: val }).eq('id', acc.id)
+                                          showToast(`Updated lots size to ${val} for ${(acc.name || '').split('|')[0]}`, 'success')
+                                        } catch (err) {
+                                          console.error(err)
+                                          showToast("Failed to update lots size.", "error")
+                                        }
+                                      }}
+                                      className="bg-[#05070e] border border-white/10 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-cyan-500 transition duration-200 font-sans font-semibold mt-0.5 w-[50px] h-[22px]"
+                                    />
+                                  </div>
+                                  <div className="flex flex-col text-right">
+                                    <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Available Balance</span>
+                                    <span className="text-white font-mono text-sm font-extrabold mt-0.5">
+                                      {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="flex items-center justify-between border-t border-white/5 pt-3 mt-1">
                                   <span className="text-[7px] text-gray-500 font-mono">Delta India</span>
@@ -2033,6 +2078,19 @@ export default function App() {
                   placeholder="Paste private API secret key" 
                   required
                   className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans"
+                />
+              </div>
+
+               <div className="flex flex-col gap-1.5">
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest font-sans">Trading Quantity (Lots)</label>
+                <input 
+                  type="number" 
+                  min="1"
+                  value={accLots} 
+                  onChange={e => setAccLots(e.target.value)}
+                  placeholder="1" 
+                  required
+                  className="bg-[#05070e] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition duration-200 font-sans font-semibold"
                 />
               </div>
 
