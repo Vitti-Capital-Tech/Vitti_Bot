@@ -349,7 +349,7 @@ def execute_decay1_entry(supabase: Client):
                         product_id=prod_id,
                         size=size,
                         sl_price=str(sl_price_premium),
-                        sl_trigger_method='last_traded_price',
+                        sl_trigger_method='mark_price',
                         tp_price=str(tp_spot) if tp_spot > 0 else None,
                         tp_trigger_method='spot_price'
                     )
@@ -412,7 +412,7 @@ def execute_decay1_entry(supabase: Client):
                                 product_id=prod_id,
                                 size=size,
                                 sl_price=str(sl_price_premium),
-                                sl_trigger_method='last_traded_price',
+                                sl_trigger_method='mark_price',
                                 tp_price=str(tp_spot) if tp_spot > 0 else None,
                                 tp_trigger_method='spot_price'
                             )

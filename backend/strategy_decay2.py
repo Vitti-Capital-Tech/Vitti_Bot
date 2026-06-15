@@ -194,25 +194,44 @@ def execute_decay2_entry(supabase: Client):
                     if fill_price <= 0.0:
                         fill_price = entry_premium
                     
-                    # Recalculate SL & TP targets based on actual entry fill price
+                    # Wait for position to register on exchange
+                    time.sleep(1.5)
+                    
+                    # Fetch actual position entry price from Delta (more accurate than avg_fill_price)
+                    try:
+                        positions_resp = client.request('GET', '/v2/positions', query_params={'product_id': int(prod_id)})
+                        # Response is a direct dict: {'size': -1, 'entry_price': '45.0'}
+                        if isinstance(positions_resp, dict) and positions_resp.get('entry_price'):
+                            pos_entry = safe_float(positions_resp.get('entry_price'))
+                        else:
+                            # Try list/result format as fallback
+                            pos_list = positions_resp if isinstance(positions_resp, list) else positions_resp.get('result', [])
+                            pos_entry = next((safe_float(p.get('entry_price')) for p in pos_list if safe_float(p.get('size', 0)) != 0), 0.0)
+                        if pos_entry > 0:
+                            log_trade_event(supabase, name, f"Using position entry price {pos_entry} (was avg_fill {fill_price}) for {symbol} SL/TP calc", 'INFO', 'decay2')
+                            fill_price = pos_entry
+                        else:
+                            log_trade_event(supabase, name, f"Position entry price not found, using avg_fill {fill_price} for {symbol}", 'INFO', 'decay2')
+                    except Exception as pos_err:
+                        log_trade_event(supabase, name, f"Could not fetch position entry price for {symbol}, using avg_fill {fill_price}: {pos_err}", 'INFO', 'decay2')
+                    
+                    # Recalculate SL & TP targets based on actual position entry price
                     sl_price = round(fill_price * sl_multiplier, 2)
                     tp_premium = round(fill_price * tgt_mult, 2)
-                    
-                    # Wait for position to register on exchange before placing reduce_only orders
-                    time.sleep(1.5)
                     
                     # 2. Attach separate SL + TP orders on exchange
                     bracket_results = {}
                     if sl_price is not None:
+                        # limit_price set to 1.5x trigger to ensure fill even if market gaps past trigger
                         sl_payload = {
                             "product_id": int(prod_id),
                             "size": int(size),
                             "side": "buy",
                             "order_type": "limit_order",
-                            "limit_price": str(sl_price),
+                            "limit_price": str(round(sl_price * 1.5, 2)),
                             "stop_price": str(sl_price),
                             "stop_order_type": "stop_loss_order",
-                            "stop_trigger_method": "last_traded_price",
+                            "stop_trigger_method": "mark_price",
                             "reduce_only": True
                         }
                         try:
@@ -285,25 +304,43 @@ def execute_decay2_entry(supabase: Client):
                             
                             fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
                             
-                            # Recalculate SL & TP targets based on actual entry fill price
+                            # Wait for position to register on exchange
+                            time.sleep(1.5)
+                            
+                            # Fetch actual position entry price from Delta (more accurate than order price)
+                            try:
+                                positions_resp = client.request('GET', '/v2/positions', query_params={'product_id': int(prod_id)})
+                                # Response is a direct dict: {'size': -1, 'entry_price': '45.0'}
+                                if isinstance(positions_resp, dict) and positions_resp.get('entry_price'):
+                                    pos_entry = safe_float(positions_resp.get('entry_price'))
+                                else:
+                                    pos_list = positions_resp if isinstance(positions_resp, list) else positions_resp.get('result', [])
+                                    pos_entry = next((safe_float(p.get('entry_price')) for p in pos_list if safe_float(p.get('size', 0)) != 0), 0.0)
+                                if pos_entry > 0:
+                                    log_trade_event(supabase, name, f"Using position entry price {pos_entry} (was limit {fill_price}) for {symbol} SL/TP calc", 'INFO', 'decay2')
+                                    fill_price = pos_entry
+                                else:
+                                    log_trade_event(supabase, name, f"Position entry price not found, using limit_price {fill_price} for {symbol}", 'INFO', 'decay2')
+                            except Exception as pos_err:
+                                log_trade_event(supabase, name, f"Could not fetch position entry price for {symbol}, using limit_price {fill_price}: {pos_err}", 'INFO', 'decay2')
+                            
+                            # Recalculate SL & TP targets based on actual position entry price
                             sl_price = round(fill_price * sl_multiplier, 2)
                             tp_premium = round(fill_price * tgt_mult, 2)
-                            
-                            # Wait for position to register on exchange before placing reduce_only orders
-                            time.sleep(1.0)
                             
                             # 2. Attach separate SL + TP orders on exchange
                             bracket_results = {}
                             if sl_price is not None:
+                                # limit_price set to 1.5x trigger to ensure fill even if market gaps past trigger
                                 sl_payload = {
                                     "product_id": int(prod_id),
                                     "size": int(size),
                                     "side": "buy",
                                     "order_type": "limit_order",
-                                    "limit_price": str(sl_price),
+                                    "limit_price": str(round(sl_price * 1.5, 2)),
                                     "stop_price": str(sl_price),
                                     "stop_order_type": "stop_loss_order",
-                                    "stop_trigger_method": "last_traded_price",
+                                    "stop_trigger_method": "mark_price",
                                     "reduce_only": True
                                 }
                                 try:

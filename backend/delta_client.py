@@ -279,12 +279,14 @@ class DeltaClient:
 
         # Attach Stop Loss: triggered on mark_price
         if sl_price is not None:
+            # limit_price set to 1.5x trigger to ensure fill even if market gaps past trigger
+            sl_limit_price = str(round(float(sl_price) * 1.5, 2))
             sl_payload = {
                 "product_id": int(product_id),
                 "size": int(size),
                 "side": "buy",   # closing a short position
                 "order_type": "limit_order",
-                "limit_price": str(sl_price),
+                "limit_price": sl_limit_price,
                 "stop_price": str(sl_price),
                 "stop_order_type": "stop_loss_order",
                 "stop_trigger_method": sl_trigger_method,
