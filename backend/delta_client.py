@@ -353,16 +353,16 @@ class DeltaClient:
         """
         Cancels all open orders and any pending conditional/stop orders.
         """
-        payload = {}
+        delete_params = {}
         if product_id is not None:
-            payload["product_id"] = int(product_id)
+            delete_params["product_id"] = int(product_id)
         
         # 1. Cancel standard open orders
-        res = self.request('DELETE', '/v2/orders/all', payload=payload)
+        res = self.request('DELETE', '/v2/orders/all', query_params=delete_params)
         
         # 2. Cancel pending stop/conditional orders (like TP and SL)
         try:
-            query_params = {"state": "pending"}
+            query_params = {"states": "open,pending"}
             if product_id is not None:
                 query_params["product_id"] = int(product_id)
             pending_orders = self.request('GET', '/v2/orders', query_params=query_params)
