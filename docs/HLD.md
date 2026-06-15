@@ -88,9 +88,14 @@ graph LR
 
 ### Risk Controls
 *   **Dynamic Strike Selection (OTM1 to OTM6)**: The bot allows users to dynamically configure the option strike selection from the dashboard. OTM1 offers high liquidity and premiums, while OTM6 offers deeper out-of-the-money targets.
-*   **Python-Managed leg-wise Stop Loss**: Stop-loss risk is managed entirely by the local Python background daemon using live **`best_ask`** market prices (since closing short options requires buying them back at the ask premium). If `best_ask >= sl_price`, the bot immediately fires a market buy order to close the leg, bypassing slow or rigid exchange-native triggers.
-*   **Underlying Spot Target (Decay 1)**: If the price of the underlying asset (BTC spot) moves past the configured target percentage in either direction from the initial strangle entry level, the bot immediately triggers a market close for that specific leg.
-*   **Joint Exit Protection (Decay 2)**: If either strangle leg is hit (Stop Loss or Take Profit), the bot immediately triggers a joint exit to square off the remaining leg at market, neutralizing active portfolio risk.
+*   **Stop Loss (Exchange-Native & Local)**:
+    *   **Real Trading Accounts**: Utilizes native **Stop Limit** orders placed directly on Delta Exchange with a 1.5x limit price buffer (Limit Price = Trigger Price × 1.5) to guarantee fill in fast-moving markets or gaps.
+    *   **Paper Trading Accounts**: Managed locally by the Python background daemon using live contract mark prices.
+*   **Underlying Spot Target / Take Profit**:
+    *   **Decay 1**: If the price of the underlying asset (BTC spot) moves past the configured target percentage in either direction from the entry level, a native **Take Profit Limit** order (or local check for paper trading) triggers a close.
+    *   **Decay 2**: Uses exchange-native bracket orders (or local monitoring for paper) to trigger Take Profit at target premium levels.
+*   **Joint Exit Protection (Decay 2)**: If either strangle leg is hit (Stop Loss or Take Profit), the system triggers a joint exit to square off the remaining leg, neutralizing active portfolio risk.
+*   **Automatic Reconciliation**: The local Python daemon continuously reconciles open positions by listening to Delta Exchange. If a position is filled/closed on-chain via native SL/TP triggers, the daemon updates the Supabase database and cancels any remaining resting orders.
 
 ---
 

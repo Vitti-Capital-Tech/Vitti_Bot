@@ -122,23 +122,24 @@ stateDiagram-v2
     
     state "Position Entry" as Entry {
         Standby --> Strike_Selected: User IST timer triggers
-        Strike_Selected --> Order_Sent: Send Short Market Orders (Unbracketed)
-        Order_Sent --> Open: Order filled on exchange
+        Strike_Selected --> Order_Sent: Send Short Market Orders
+        Order_Sent --> Attach_Brackets: Attach Native SL (Stop Limit) + TP Orders
+        Attach_Brackets --> Open: Position active and monitored
     }
 
     state "Live Monitoring Loop" as Loop {
-        Open --> Spot_Limit_Reached: BTC Spot moves past target (Decay 1)
-        Open --> Hard_Time_Reached: Time clock hit Exit IST
-        Open --> SL_Leg_Breached: Option Premium best_ask >= SL Target (Local)
-        Open --> TP_Leg_Breached: Option Premium best_ask <= TP Target (Local - Decay 2)
+        Open --> Spot_Limit_Reached: BTC Spot target hit (Decay 1 - Native/Paper)
+        Open --> Hard_Time_Reached: Time clock hit Exit IST (Local Daemon)
+        Open --> SL_Leg_Breached: Option Premium SL hit (Native Stop Limit / Local Paper)
+        Open --> TP_Leg_Breached: Option Premium TP hit (Native Limit / Local Paper)
         Open --> Close_Requested: Dashboard 'Square Off' clicked
     }
 
     state "Position Exit" as Exit {
-        Spot_Limit_Reached --> Close_Order_Placed: Exit Strangle
+        Spot_Limit_Reached --> Closed: Filled on exchange / Reconciled
         Hard_Time_Reached --> Close_Order_Placed: Exit Strangle
-        SL_Leg_Breached --> Close_Order_Placed: Exit Leg / Strangle
-        TP_Leg_Breached --> Close_Order_Placed: Exit Leg / Strangle
+        SL_Leg_Breached --> Closed: Stop Limit executed (1.5x trigger buffer) / Reconciled
+        TP_Leg_Breached --> Closed: Take Profit executed / Reconciled
         Close_Requested --> Close_Order_Placed: Exit Strangle/Leg
         
         Close_Order_Placed --> Closed: Fill successful on exchange
@@ -149,7 +150,7 @@ stateDiagram-v2
 
 ### State-to-State Database Mappings
 1.  **Dashboard Emergency Request**: When a user clicks "Square Off", the dashboard updates `positions.status` from `'open'` to `'close_requested'` and registers a log in the database.
-2.  **Daemon Interception**: The 10-second background monitor thread queries for positions matching `.in_('status', ['open', 'close_requested'])`.
+2.  **Daemon Interception / Reconciliation**: The 10-second background monitor thread checks live active positions from Delta Exchange. If a position is closed (either by native SL/TP execution, or manual client action), the bot automatically reconciles it by updating `positions.status` to `'closed'`, registering execution logs, and canceling any leftover TP/SL resting orders.
 3.  **Daemon Exit Execution**: If a position's status is `'close_requested'`, the daemon immediately signs a market-buy request to buy back the option contract, updates the position state to `'closed'`, and sets `closed_at = now()`.
 
 ---
