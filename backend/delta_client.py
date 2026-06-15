@@ -358,7 +358,11 @@ class DeltaClient:
             delete_params["product_id"] = int(product_id)
         
         # 1. Cancel standard open orders
-        res = self.request('DELETE', '/v2/orders/all', query_params=delete_params)
+        res = {}
+        try:
+            res = self.request('DELETE', '/v2/orders/all', query_params=delete_params)
+        except Exception as e:
+            print(f"Notice: cancel_all_orders DELETE standard failed: {e}")
         
         # 2. Cancel pending stop/conditional orders (like TP and SL)
         try:
