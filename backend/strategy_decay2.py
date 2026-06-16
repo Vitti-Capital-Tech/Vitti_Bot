@@ -238,6 +238,34 @@ def execute_decay2_entry(supabase: Client):
                     # Recalculate TP target based on actual position entry price (SL trigger is already locked natively)
                     tp_premium = round(fill_price * tgt_mult, 2)
                     
+                    # Recalculate and adjust native SL bracket to match actual fill price exactly
+                    exact_sl_price = round(fill_price * sl_multiplier, 2)
+                    if exact_sl_price != sl_price:
+                        try:
+                            # Retrieve the pending native SL order ID to modify it
+                            pending_orders = client.request('GET', '/v2/orders', query_params={'states': 'pending', 'product_id': int(prod_id)})
+                            sl_order = None
+                            if isinstance(pending_orders, list):
+                                for o in pending_orders:
+                                    if o.get('stop_order_type') == 'stop_loss_order' and o.get('bracket_order') is True:
+                                        sl_order = o
+                                        break
+                            if sl_order:
+                                sl_order_id = sl_order.get('id')
+                                update_payload = {
+                                    "id": int(sl_order_id),
+                                    "product_id": int(prod_id),
+                                    "stop_price": str(exact_sl_price)
+                                }
+                                client.request('PUT', '/v2/orders', payload=update_payload)
+                                log_trade_event(supabase, name, f"Adjusted native SL bracket for {symbol} to exact price {exact_sl_price} (was estimated {sl_price})", 'INFO', 'decay2')
+                                sl_price = exact_sl_price
+                            else:
+                                log_trade_event(supabase, name, f"Notice: Native SL bracket order not found for adjustment on {symbol}", 'INFO', 'decay2')
+                        except Exception as adjust_err:
+                            log_trade_event(supabase, name, f"Warning: Failed to adjust native SL bracket for {symbol}: {adjust_err}", 'ERROR', 'decay2')
+
+                    
                     # 2. Attach separate TP resting limit order on exchange
                     bracket_results = {}
                     if tp_premium is not None and tp_premium > 0:
@@ -327,6 +355,33 @@ def execute_decay2_entry(supabase: Client):
                             # Recalculate TP target based on actual position entry price (SL trigger is already locked natively)
                             sl_price = sl_price_lim
                             tp_premium = round(fill_price * tgt_mult, 2)
+                            
+                            # Recalculate and adjust native SL bracket to match actual fill price exactly
+                            exact_sl_price = round(fill_price * sl_multiplier, 2)
+                            if exact_sl_price != sl_price:
+                                try:
+                                    # Retrieve the pending native SL order ID to modify it
+                                    pending_orders = client.request('GET', '/v2/orders', query_params={'states': 'pending', 'product_id': int(prod_id)})
+                                    sl_order = None
+                                    if isinstance(pending_orders, list):
+                                        for o in pending_orders:
+                                            if o.get('stop_order_type') == 'stop_loss_order' and o.get('bracket_order') is True:
+                                                sl_order = o
+                                                break
+                                    if sl_order:
+                                        sl_order_id = sl_order.get('id')
+                                        update_payload = {
+                                            "id": int(sl_order_id),
+                                            "product_id": int(prod_id),
+                                            "stop_price": str(exact_sl_price)
+                                        }
+                                        client.request('PUT', '/v2/orders', payload=update_payload)
+                                        log_trade_event(supabase, name, f"Adjusted native SL bracket for {symbol} to exact price {exact_sl_price} (was estimated {sl_price})", 'INFO', 'decay2')
+                                        sl_price = exact_sl_price
+                                    else:
+                                        log_trade_event(supabase, name, f"Notice: Native SL bracket order not found for adjustment on {symbol}", 'INFO', 'decay2')
+                                except Exception as adjust_err:
+                                    log_trade_event(supabase, name, f"Warning: Failed to adjust native SL bracket for {symbol}: {adjust_err}", 'ERROR', 'decay2')
                             
                             # 2. Attach separate TP order on exchange
                             bracket_results = {}
