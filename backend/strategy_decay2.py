@@ -181,14 +181,12 @@ def execute_decay2_entry(supabase: Client):
                     except Exception:
                         pass
                         
-                    # 1. Place the Entry Sell Order at market with native SL bracket
+                    # 1. Place the Entry Sell Order at market (no brackets attached initially)
                     order = client.place_order(
                         product_id=prod_id,
                         size=size,
                         side='sell',
                         order_type='market_order',
-                        sl_price=str(sl_price) if sl_price > 0 else None,
-                        stop_trigger_method='mark_price',
                         client_order_id=f"decay2_{leg.lower()}_{int(time.time())}"
                     )
                     
@@ -208,18 +206,30 @@ def execute_decay2_entry(supabase: Client):
                             pos_list = positions_resp if isinstance(positions_resp, list) else positions_resp.get('result', [])
                             pos_entry = next((safe_float(p.get('entry_price')) for p in pos_list if safe_float(p.get('size', 0)) != 0), 0.0)
                         if pos_entry > 0:
-                            log_trade_event(supabase, name, f"Using position entry price {pos_entry} (was avg_fill {fill_price}) for {symbol} TP calc", 'INFO', 'decay2')
+                            log_trade_event(supabase, name, f"Using position entry price {pos_entry} (was avg_fill {fill_price}) for {symbol} SL/TP calc", 'INFO', 'decay2')
                             fill_price = pos_entry
                         else:
                             log_trade_event(supabase, name, f"Position entry price not found, using avg_fill {fill_price} for {symbol}", 'INFO', 'decay2')
                     except Exception as pos_err:
                         log_trade_event(supabase, name, f"Could not fetch position entry price for {symbol}, using avg_fill {fill_price}: {pos_err}", 'INFO', 'decay2')
                     
-                    # Recalculate TP target based on actual position entry price (SL trigger is already locked natively)
+                    # Recalculate SL & TP targets based on actual position entry price
+                    sl_price = round(fill_price * sl_multiplier, 2)
                     tp_premium = round(fill_price * tgt_mult, 2)
                     
-                    # 2. Attach separate TP resting limit order on exchange
+                    # 2. Attach native SL bracket on open position and place separate TP order
                     bracket_results = {}
+                    try:
+                        bracket_payload = {
+                            "product_id": int(prod_id),
+                            "bracket_stop_loss_price": str(sl_price),
+                            "bracket_stop_trigger_method": "mark_price"
+                        }
+                        client.request('POST', '/v2/orders/bracket', payload=bracket_payload)
+                        log_trade_event(supabase, name, f"Native SL bracket attached for {symbol}: Stop at Mark {sl_price}", 'INFO', 'decay2')
+                    except Exception as sl_err:
+                        log_trade_event(supabase, name, f"Warning: Failed to attach native SL for {symbol}: {sl_err}", 'ERROR', 'decay2')
+                            
                     if tp_premium is not None and tp_premium > 0:
                         tp_payload = {
                             "product_id": int(prod_id),
@@ -239,9 +249,6 @@ def execute_decay2_entry(supabase: Client):
                     elif bracket_results.get('tp'):
                         tp_order_id = bracket_results['tp'].get('id', '?')
                         log_trade_event(supabase, name, f"TP limit order placed in book for {symbol}: Limit at {tp_premium} (Order ID: {tp_order_id})", 'INFO', 'decay2')
-
-                    # For display/dashboard logs, the native bracket SL is active
-                    log_trade_event(supabase, name, f"Native SL bracket attached for {symbol}: Stop at Mark {sl_price}", 'INFO', 'decay2')
 
                     # Insert position details into Supabase
                     supabase.table('positions').insert({
