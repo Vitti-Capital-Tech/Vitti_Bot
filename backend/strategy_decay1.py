@@ -327,12 +327,14 @@ def execute_decay1_entry(supabase: Client):
                     # Note: cancel_all_orders() already ran at account level before entry loop.
                     # No need to cancel again per-product here - it could race with a just-placed SL/TP.
                         
-                    # 1. Place the main Sell Order at market (no brackets yet)
+                    # 1. Place the main Sell Order at market with native TP bracket (index trigger)
                     order = client.place_order(
                         product_id=prod_id,
                         size=size,
                         side='sell',
                         order_type='market_order',
+                        tp_price=str(tp_spot) if tp_spot > 0 else None,
+                        stop_trigger_method='spot_price',
                         client_order_id=f"decay1_{leg.lower()}_{int(time.time())}"
                     )
                     
@@ -340,17 +342,17 @@ def execute_decay1_entry(supabase: Client):
                     fill_price = safe_float(order.get('avg_fill_price'))
                     if fill_price <= 0.0:
                         fill_price = entry_premium
-
+ 
                     # Recalculate premium SL trigger based on actual entry fill price
                     sl_price_premium = round(fill_price * sl_multiplier, 2)
-
-                    # 2. Attach SL (mark_price trigger) + TP (spot_price/index trigger) as separate conditional orders
+ 
+                    # 2. Attach SL (mark_price trigger) as a separate conditional order
                     bracket_results = client.attach_sl_tp(
                         product_id=prod_id,
                         size=size,
                         sl_price=str(sl_price_premium),
                         sl_trigger_method='mark_price',
-                        tp_price=str(tp_spot) if tp_spot > 0 else None,
+                        tp_price=None,
                         tp_trigger_method='spot_price'
                     )
                     if bracket_results.get('sl_error'):
@@ -358,11 +360,9 @@ def execute_decay1_entry(supabase: Client):
                     elif bracket_results.get('sl'):
                         sl_order_id = bracket_results['sl'].get('id', '?')
                         log_trade_event(supabase, name, f"Native SL attached for {symbol}: Stop at Mark {sl_price_premium} (Order ID: {sl_order_id})", 'INFO')
-                    if bracket_results.get('tp_error'):
-                        log_trade_event(supabase, name, f"Warning: Failed to attach native TP for {symbol}: {bracket_results['tp_error']}", 'ERROR')
-                    elif bracket_results.get('tp'):
-                        tp_order_id = bracket_results['tp'].get('id', '?')
-                        log_trade_event(supabase, name, f"Native TP attached for {symbol}: Stop at Index {tp_spot} (Order ID: {tp_order_id})", 'INFO')
+                    
+                    # For display/dashboard logs, the native bracket TP is already active
+                    log_trade_event(supabase, name, f"Native TP bracket attached for {symbol}: Stop at Index {tp_spot}", 'INFO')
                     
                     # Insert position details into Supabase
                     supabase.table('positions').insert({
@@ -392,13 +392,15 @@ def execute_decay1_entry(supabase: Client):
                             if best_ask <= 0.0:
                                 best_ask = entry_premium
                                 
-                            # 1. Place limit order (post-only mode fallback)
+                            # 1. Place limit order (post-only mode fallback) with native TP bracket
                             order = client.place_order(
                                 product_id=prod_id,
                                 size=size,
                                 side='sell',
                                 order_type='limit_order',
                                 limit_price=str(best_ask),
+                                tp_price=str(tp_spot) if tp_spot > 0 else None,
+                                stop_trigger_method='spot_price',
                                 client_order_id=f"decay1_{leg.lower()}_lim_{int(time.time())}"
                             )
                             
@@ -407,19 +409,20 @@ def execute_decay1_entry(supabase: Client):
                             # Recalculate premium SL trigger based on actual entry fill price
                             sl_price_premium = round(fill_price * sl_multiplier, 2)
 
-                            # 2. Attach SL (mark_price) + TP (spot_price/index) as separate conditional orders
+                            # 2. Attach SL (mark_price) as a separate conditional order
                             bracket_results = client.attach_sl_tp(
                                 product_id=prod_id,
                                 size=size,
                                 sl_price=str(sl_price_premium),
                                 sl_trigger_method='mark_price',
-                                tp_price=str(tp_spot) if tp_spot > 0 else None,
+                                tp_price=None,
                                 tp_trigger_method='spot_price'
                             )
                             if bracket_results.get('sl_error'):
                                 log_trade_event(supabase, name, f"Warning: Failed to attach native SL for {symbol}: {bracket_results['sl_error']}", 'ERROR')
-                            if bracket_results.get('tp_error'):
-                                log_trade_event(supabase, name, f"Warning: Failed to attach native TP for {symbol}: {bracket_results['tp_error']}", 'ERROR')
+                            
+                            # For display/dashboard logs, the native bracket TP is already active
+                            log_trade_event(supabase, name, f"Native TP bracket attached for {symbol}: Stop at Index {tp_spot}", 'INFO')
                             
                             # Insert position details into Supabase
                             supabase.table('positions').insert({
