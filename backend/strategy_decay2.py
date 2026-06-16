@@ -213,22 +213,25 @@ def execute_decay2_entry(supabase: Client):
                     except Exception as pos_err:
                         log_trade_event(supabase, name, f"Could not fetch position entry price for {symbol}, using avg_fill {fill_price}: {pos_err}", 'INFO', 'decay2')
                     
-                    # Recalculate SL & TP targets based on actual position entry price
+                    # Recalculate SL and TP targets based on actual position entry price
                     sl_price = round(fill_price * sl_multiplier, 2)
                     tp_premium = round(fill_price * tgt_mult, 2)
                     
-                    # 2. Attach native SL bracket on open position and place separate TP order
+                    # 2. Attach native SL bracket and separate TP resting limit order
                     bracket_results = {}
-                    try:
-                        bracket_payload = {
+                    if sl_price is not None and sl_price > 0:
+                        sl_payload = {
+                            "id": int(order.get('id')),
                             "product_id": int(prod_id),
                             "bracket_stop_loss_price": str(sl_price),
                             "bracket_stop_trigger_method": "mark_price"
                         }
-                        client.request('POST', '/v2/orders/bracket', payload=bracket_payload)
-                        log_trade_event(supabase, name, f"Native SL bracket attached for {symbol}: Stop at Mark {sl_price}", 'INFO', 'decay2')
-                    except Exception as sl_err:
-                        log_trade_event(supabase, name, f"Warning: Failed to attach native SL for {symbol}: {sl_err}", 'ERROR', 'decay2')
+                        try:
+                            bracket_results['sl'] = client.request('POST', '/v2/orders/bracket', payload=sl_payload)
+                            log_trade_event(supabase, name, f"Native SL bracket attached for {symbol}: Stop at Mark {sl_price}", 'INFO', 'decay2')
+                        except Exception as sl_err:
+                            bracket_results['sl_error'] = str(sl_err)
+                            log_trade_event(supabase, name, f"Warning: Failed to attach native SL bracket for {symbol}: {sl_err}", 'ERROR', 'decay2')
                             
                     if tp_premium is not None and tp_premium > 0:
                         tp_payload = {
