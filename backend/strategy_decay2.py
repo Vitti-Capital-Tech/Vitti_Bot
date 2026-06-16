@@ -136,11 +136,31 @@ def execute_decay2_entry(supabase: Client):
                         except Exception as close_err:
                             log_trade_event(supabase, name, f"Failed to square off existing position for {symbol}: {close_err}", 'ERROR', 'decay2')
             
+            # Fetch Level 2 orderbook for precision entry premium and ask estimation
+            l2_best_bid = 0.0
+            l2_best_ask = 0.0
+            if not is_paper:
+                try:
+                    l2_resp = client.request('GET', f"/v2/l2orderbook/{symbol}", query_params={"depth": 1})
+                    buy_list = l2_resp.get('buy', [])
+                    sell_list = l2_resp.get('sell', [])
+                    if buy_list:
+                        l2_best_bid = safe_float(buy_list[0].get('price'))
+                    if sell_list:
+                        l2_best_ask = safe_float(sell_list[0].get('price'))
+                    log_trade_event(supabase, name, f"L2 Orderbook for {symbol}: Bid = {l2_best_bid}, Ask = {l2_best_ask}", 'INFO', 'decay2')
+                except Exception as l2_err:
+                    log_trade_event(supabase, name, f"Warning: Failed to fetch L2 orderbook for {symbol}: {l2_err}", 'INFO', 'decay2')
+            
+            # Fallback to option chain ticker values if L2 is empty/failed
+            best_bid = l2_best_bid if l2_best_bid > 0 else (contract.get('best_bid') or 0.0)
+            best_ask = l2_best_ask if l2_best_ask > 0 else (contract.get('best_ask') or 0.0)
+            
             # Fetch current premium for the leg (use best_bid for short strangle entry)
-            entry_premium = contract['best_bid'] if contract['best_bid'] > 0 else (contract['mark_price'] if contract['mark_price'] > 0 else 50.0)
+            entry_premium = best_bid if best_bid > 0 else (contract.get('mark_price') or 50.0)
             
             # Fetch current mark price for the option at entry
-            mark_price_at_entry = contract['mark_price'] if contract['mark_price'] > 0 else (contract['best_bid'] if contract['best_bid'] > 0 else 50.0)
+            mark_price_at_entry = contract.get('mark_price') or entry_premium
             
             # Calculate SL Trigger Premium (2.0x for short strangle decay2) using entry_premium as a baseline
             sl_price = round(entry_premium * sl_multiplier, 2)
@@ -181,12 +201,14 @@ def execute_decay2_entry(supabase: Client):
                     except Exception:
                         pass
                         
-                    # 1. Place the Entry Sell Order at market (no brackets attached initially)
+                    # 1. Place the Entry Sell Order at market with native SL bracket
                     order = client.place_order(
                         product_id=prod_id,
                         size=size,
                         side='sell',
                         order_type='market_order',
+                        sl_price=str(sl_price) if sl_price > 0 else None,
+                        stop_trigger_method='mark_price',
                         client_order_id=f"decay2_{leg.lower()}_{int(time.time())}"
                     )
                     
@@ -206,33 +228,18 @@ def execute_decay2_entry(supabase: Client):
                             pos_list = positions_resp if isinstance(positions_resp, list) else positions_resp.get('result', [])
                             pos_entry = next((safe_float(p.get('entry_price')) for p in pos_list if safe_float(p.get('size', 0)) != 0), 0.0)
                         if pos_entry > 0:
-                            log_trade_event(supabase, name, f"Using position entry price {pos_entry} (was avg_fill {fill_price}) for {symbol} SL/TP calc", 'INFO', 'decay2')
+                            log_trade_event(supabase, name, f"Using position entry price {pos_entry} (was avg_fill {fill_price}) for {symbol} TP calc", 'INFO', 'decay2')
                             fill_price = pos_entry
                         else:
                             log_trade_event(supabase, name, f"Position entry price not found, using avg_fill {fill_price} for {symbol}", 'INFO', 'decay2')
                     except Exception as pos_err:
                         log_trade_event(supabase, name, f"Could not fetch position entry price for {symbol}, using avg_fill {fill_price}: {pos_err}", 'INFO', 'decay2')
                     
-                    # Recalculate SL and TP targets based on actual position entry price
-                    sl_price = round(fill_price * sl_multiplier, 2)
+                    # Recalculate TP target based on actual position entry price (SL trigger is already locked natively)
                     tp_premium = round(fill_price * tgt_mult, 2)
                     
-                    # 2. Attach native SL bracket and separate TP resting limit order
+                    # 2. Attach separate TP resting limit order on exchange
                     bracket_results = {}
-                    if sl_price is not None and sl_price > 0:
-                        sl_payload = {
-                            "id": int(order.get('id')),
-                            "product_id": int(prod_id),
-                            "bracket_stop_loss_price": str(sl_price),
-                            "bracket_stop_trigger_method": "mark_price"
-                        }
-                        try:
-                            bracket_results['sl'] = client.request('POST', '/v2/orders/bracket', payload=sl_payload)
-                            log_trade_event(supabase, name, f"Native SL bracket attached for {symbol}: Stop at Mark {sl_price}", 'INFO', 'decay2')
-                        except Exception as sl_err:
-                            bracket_results['sl_error'] = str(sl_err)
-                            log_trade_event(supabase, name, f"Warning: Failed to attach native SL bracket for {symbol}: {sl_err}", 'ERROR', 'decay2')
-                            
                     if tp_premium is not None and tp_premium > 0:
                         tp_payload = {
                             "product_id": int(prod_id),
@@ -246,13 +253,16 @@ def execute_decay2_entry(supabase: Client):
                             bracket_results['tp'] = client.request('POST', '/v2/orders', payload=tp_payload)
                         except Exception as tp_err:
                             bracket_results['tp_error'] = str(tp_err)
-
+ 
                     if bracket_results.get('tp_error'):
                         log_trade_event(supabase, name, f"Warning: Failed to place TP limit order for {symbol}: {bracket_results['tp_error']}", 'ERROR', 'decay2')
                     elif bracket_results.get('tp'):
                         tp_order_id = bracket_results['tp'].get('id', '?')
                         log_trade_event(supabase, name, f"TP limit order placed in book for {symbol}: Limit at {tp_premium} (Order ID: {tp_order_id})", 'INFO', 'decay2')
-
+ 
+                    # For display/dashboard logs, the native bracket SL is active
+                    log_trade_event(supabase, name, f"Native SL bracket attached for {symbol}: Stop at Mark {sl_price}", 'INFO', 'decay2')
+ 
                     # Insert position details into Supabase
                     supabase.table('positions').insert({
                         'account_id': acc['id'],
@@ -277,12 +287,9 @@ def execute_decay2_entry(supabase: Client):
                     if "market_disrupted_post_only_mode" in err_str:
                         log_trade_event(supabase, name, f"Decay2: Post-Only mode detected for {symbol}. Retrying with Limit Order at best ask...", 'INFO', 'decay2')
                         try:
-                            best_ask = safe_float(contract.get('best_ask'), entry_premium)
-                            if best_ask <= 0.0:
-                                best_ask = entry_premium
-                                
-                            # Calculate SL price based on the limit price best_ask
-                            sl_price_lim = round(best_ask * sl_multiplier, 2)
+                            best_ask_val = best_ask if best_ask > 0 else entry_premium
+                            # Calculate SL price based on the limit price best_ask_val
+                            sl_price_lim = round(best_ask_val * sl_multiplier, 2)
                             
                             # Place limit order with native SL bracket
                             order = client.place_order(
@@ -290,13 +297,13 @@ def execute_decay2_entry(supabase: Client):
                                 size=size,
                                 side='sell',
                                 order_type='limit_order',
-                                limit_price=str(best_ask),
+                                limit_price=str(best_ask_val),
                                 sl_price=str(sl_price_lim) if sl_price_lim > 0 else None,
                                 stop_trigger_method='mark_price',
                                 client_order_id=f"decay2_{leg.lower()}_lim_{int(time.time())}"
                             )
                             
-                            fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
+                            fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask_val
                             
                             # Wait for position to register on exchange
                             time.sleep(1.5)

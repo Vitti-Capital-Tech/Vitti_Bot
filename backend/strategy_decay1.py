@@ -277,11 +277,31 @@ def execute_decay1_entry(supabase: Client):
                         except Exception as close_err:
                             log_trade_event(supabase, name, f"Failed to square off existing position for {symbol}: {close_err}", 'ERROR')
             
+            # Fetch Level 2 orderbook for precision entry premium and ask estimation
+            l2_best_bid = 0.0
+            l2_best_ask = 0.0
+            if not is_paper:
+                try:
+                    l2_resp = client.request('GET', f"/v2/l2orderbook/{symbol}", query_params={"depth": 1})
+                    buy_list = l2_resp.get('buy', [])
+                    sell_list = l2_resp.get('sell', [])
+                    if buy_list:
+                        l2_best_bid = safe_float(buy_list[0].get('price'))
+                    if sell_list:
+                        l2_best_ask = safe_float(sell_list[0].get('price'))
+                    log_trade_event(supabase, name, f"L2 Orderbook for {symbol}: Bid = {l2_best_bid}, Ask = {l2_best_ask}", 'INFO')
+                except Exception as l2_err:
+                    log_trade_event(supabase, name, f"Warning: Failed to fetch L2 orderbook for {symbol}: {l2_err}", 'INFO')
+            
+            # Fallback to option chain ticker values if L2 is empty/failed
+            best_bid = l2_best_bid if l2_best_bid > 0 else (contract.get('best_bid') or 0.0)
+            best_ask = l2_best_ask if l2_best_ask > 0 else (contract.get('best_ask') or 0.0)
+            
             # Fetch current premium for the leg (use best_bid for short strangle entry)
-            entry_premium = contract['best_bid'] if contract['best_bid'] > 0 else (contract['mark_price'] if contract['mark_price'] > 0 else 50.0)
+            entry_premium = best_bid if best_bid > 0 else (contract.get('mark_price') or 50.0)
             
             # Fetch current mark price for the option at entry
-            mark_price_at_entry = contract['mark_price'] if contract['mark_price'] > 0 else (contract['best_bid'] if contract['best_bid'] > 0 else 50.0)
+            mark_price_at_entry = contract.get('mark_price') or entry_premium
             
             # Calculate premium SL trigger using entry_premium as a baseline
             sl_price_premium = round(entry_premium * sl_multiplier, 2)
@@ -403,23 +423,20 @@ def execute_decay1_entry(supabase: Client):
                     if "market_disrupted_post_only_mode" in err_str:
                         log_trade_event(supabase, name, f"Post-Only mode detected for {symbol}. Retrying with Limit Order...", 'INFO')
                         try:
-                            best_ask = safe_float(contract.get('best_ask'), entry_premium)
-                            if best_ask <= 0.0:
-                                best_ask = entry_premium
-                                
+                            best_ask_val = best_ask if best_ask > 0 else entry_premium
                             # 1. Place limit order (post-only mode fallback) with native TP bracket
                             order = client.place_order(
                                 product_id=prod_id,
                                 size=size,
                                 side='sell',
                                 order_type='limit_order',
-                                limit_price=str(best_ask),
+                                limit_price=str(best_ask_val),
                                 tp_price=str(tp_spot) if tp_spot > 0 else None,
                                 stop_trigger_method='spot_price',
                                 client_order_id=f"decay1_{leg.lower()}_lim_{int(time.time())}"
                             )
                             
-                            fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask
+                            fill_price = safe_float(order.get('limit_price')) if order.get('limit_price') else best_ask_val
 
                             # Recalculate premium SL trigger based on actual entry fill price
                             sl_price_premium = round(fill_price * sl_multiplier, 2)
