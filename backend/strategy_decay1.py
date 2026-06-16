@@ -341,6 +341,21 @@ def execute_decay1_entry(supabase: Client):
                     # Fetch actual fill price
                     fill_price = safe_float(order.get('avg_fill_price'))
                     if fill_price <= 0.0:
+                        # Wait a split second for the matching engine to fill, then fetch position's entry price
+                        time.sleep(0.5)
+                        try:
+                            parts = symbol.split('-')
+                            underlying_symbol = parts[1] if len(parts) >= 2 else 'BTC'
+                            positions = client.get_positions(underlying_asset_symbol=underlying_symbol)
+                            for p in positions:
+                                p_symbol = p.get('symbol') or p.get('product_symbol') or (p.get('product') and p['product'].get('symbol'))
+                                if p_symbol == symbol:
+                                    fill_price = safe_float(p.get('entry_price'))
+                                    break
+                        except Exception as pos_err:
+                            print(f"Error fetching position entry price for SL calculation: {pos_err}")
+                            
+                    if fill_price <= 0.0:
                         fill_price = entry_premium
  
                     # Recalculate premium SL trigger based on actual entry fill price
