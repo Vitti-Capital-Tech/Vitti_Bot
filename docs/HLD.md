@@ -87,7 +87,8 @@ graph LR
 ```
 
 ### Risk Controls
-*   **Dynamic Strike Selection (OTM1 to OTM6)**: The bot allows users to dynamically configure the option strike selection from the dashboard. OTM1 offers high liquidity and premiums, while OTM6 offers deeper out-of-the-money targets.
+*   **OTM4 Strike Selection**: The bot is configured to select OTM4 contracts (4 strikes out of the money) for the strangle.
+*   **Net Premium Entry Filter**: Right before entering any strangle, the combined premium (`Call Bid + Put Bid`) of the OTM4 contracts is checked. If it is `> 20.0` points, entry proceeds. If it is `<= 20.0` points, entry is aborted and a warning is logged.
 *   **Stop Loss (Exchange-Native & Local)**:
     *   **Real Trading Accounts**: Utilizes native **Stop Limit** orders placed directly on Delta Exchange with a 1.5x limit price buffer (Limit Price = Trigger Price × 1.5) to guarantee fill in fast-moving markets or gaps.
     *   **Paper Trading Accounts**: Managed locally by the Python background daemon using live contract mark prices.

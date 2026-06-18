@@ -81,16 +81,19 @@ Option tickers are parsed inside `strategy_decay1.py` to identify option type, u
     *   `parts[2]` = Strike price (`90000`)
     *   `parts[3]` = Expiry date in `ddmmyy` format (`310125` = 31st January 2025)
 
-#### Strike Selection Logic (Dynamic OTM1 to OTM6)
+#### Strike Selection & Combined Premium Logic (OTM4)
 1.  The bot queries all active options contracts for the target asset.
 2.  Filters out contracts that do not match the current date's expiry.
 3.  Sorts all Call options by strike price in ascending order.
 4.  Sorts all Put options by strike price in descending order.
 5.  Locates the ATM (At-The-Money) contract closest to the current underlying spot price.
-6.  Extracts the dynamic rank index `N` (e.g. 1 for OTM1, 6 for OTM6) from the user's dashboard configuration.
-7.  Selects:
-    *   **Call Contract**: The contract **N positions above** the ATM contract in the sorted array.
-    *   **Put Contract**: The contract **N positions below** the ATM contract in the sorted array.
+6.  Selects:
+    *   **Call Contract**: The contract **4 positions above** (OTM4) the ATM contract in the sorted array.
+    *   **Put Contract**: The contract **4 positions below** (OTM4) the ATM contract in the sorted array.
+7.  Calculates **Combined Premium**: Sums the best bid of the selected Call option and Put option (`Call Bid + Put Bid`).
+8.  **Entry Validation**:
+    *   If `Combined Premium > 20.0`: The bot proceeds with strangle entry placement.
+    *   If `Combined Premium <= 20.0`: The entry is aborted, no trades are executed, and a warning is logged in the database.
 
 ---
 
