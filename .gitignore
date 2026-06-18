@@ -54,3 +54,7 @@ Thumbs.db
 logs/
 trade_logs/
 .system_generated/
+
+# Exported trade history backups
+positions_history.csv
+trade_logs_history.csv

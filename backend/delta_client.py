@@ -375,6 +375,9 @@ class DeltaClient:
                     o_id = o.get('id')
                     o_prod_id = o.get('product_id')
                     if o_id and o_prod_id:
+                        # Client-side safety filter: skip orders of other products
+                        if product_id is not None and int(o_prod_id) != int(product_id):
+                            continue
                         try:
                             self.cancel_order(product_id=int(o_prod_id), order_id=int(o_id))
                         except Exception as e:

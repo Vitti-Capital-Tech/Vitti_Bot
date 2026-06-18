@@ -66,13 +66,24 @@ def execute_decay2_entry(supabase: Client):
         print(f"Warning: Futures price unavailable for Decay2, falling back to spot_price: {spot}")
     print(f"Decay2 using futures price for {futures_symbol}: {spot}")
     
-    # Pick Strangle contracts
-    contracts = select_strangle_strikes(parsed, spot, strike_selection)
+    # Pick Strangle contracts (always OTM4)
+    contracts = select_strangle_strikes(parsed, spot, 'otm4')
     call_contract = contracts['C']
     put_contract = contracts['P']
     
     if not call_contract or not put_contract:
-        print("Failed to resolve Decay2 OTM Call or Put contract.")
+        print("Failed to resolve Decay2 OTM4 Call or Put contract.")
+        return
+        
+    call_bid = call_contract.get('best_bid') or 0.0
+    put_bid = put_contract.get('best_bid') or 0.0
+    net_premium = call_bid + put_bid
+    
+    if net_premium <= 20.0:
+        msg = f"Aborting entry: Combined premium {net_premium:.2f} (Call: {call_bid}, Put: {put_bid}) is not greater than 20.0 for OTM4."
+        print(msg)
+        for acc in accounts:
+            log_trade_event(supabase, acc['name'], msg, 'WARNING', 'decay2')
         return
         
     print(f"Decay2 Spot: {spot} | Selected Strangle -> Call: {call_contract['symbol']} (ID: {call_contract['product_id']}) | Put: {put_contract['symbol']} (ID: {put_contract['product_id']})")
