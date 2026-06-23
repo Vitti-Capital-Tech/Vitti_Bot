@@ -525,6 +525,9 @@ def execute_decay1_exit(supabase: Client):
                     reduce_only=True
                 )
                 
+                # Capture actual exit fill price from exchange
+                exit_fill_price = client.get_exit_fill_price(product_id=pos['product_id'])
+                
                 # Cancel all resting orders/brackets to avoid false orders later
                 try:
                     client.cancel_all_orders(product_id=pos['product_id'])
@@ -532,13 +535,16 @@ def execute_decay1_exit(supabase: Client):
                 except Exception as cancel_err:
                     print(f"Notice: Failed to cancel resting orders for time-exited leg {pos['symbol']}: {cancel_err}")
                 
-                # Update Supabase Status
-                supabase.table('positions').update({
+                # Update Supabase Status with actual exit price
+                update_payload = {
                     'status': 'closed',
                     'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                }).eq('id', pos['id']).execute()
+                }
+                if exit_fill_price > 0:
+                    update_payload['exit_price'] = exit_fill_price
+                supabase.table('positions').update(update_payload).eq('id', pos['id']).execute()
                 
-                log_trade_event(supabase, acc['name'], f"Time exit triggered. Closed Short Strangle leg: {pos['symbol']}", 'TRADE', 'decay1')
+                log_trade_event(supabase, acc['name'], f"Time exit triggered. Closed Short Strangle leg: {pos['symbol']} at {exit_fill_price if exit_fill_price > 0 else 'N/A'}", 'TRADE', 'decay1')
         except Exception as e:
             log_trade_event(supabase, acc['name'], f"Failed to time-exit {pos['symbol']}: {e}", 'ERROR', 'decay1')
 
@@ -635,10 +641,13 @@ def monitor_positions_loop(supabase: Client):
                             'pnl': round(unrealized_pnl, 6)
                         }).eq('id', pos['id']).execute()
                     
-                    # 2. Reconcile if position was manually closed on Delta Exchange directly (skip for paper)
+                    # 2. Reconcile if position was closed on Delta Exchange (SL/TP bracket or manual close)
                     if not is_paper and status == 'open' and exchange_positions is not None and symbol not in active_symbols:
                         print(f"Reconciliation: option {symbol} is closed on Delta Exchange. Updating DB status.")
                         try:
+                            # Fetch actual exit fill price from exchange fills (SL/TP bracket fills)
+                            recon_exit_price = trading_client.get_exit_fill_price(product_id=prod_id)
+                            
                             # Cancel all resting orders/brackets (like the TP) to avoid false orders
                             try:
                                 trading_client.cancel_all_orders(product_id=prod_id)
@@ -646,11 +655,14 @@ def monitor_positions_loop(supabase: Client):
                             except Exception as cancel_err:
                                 print(f"Notice: Failed to cancel resting orders for reconciled {symbol}: {cancel_err}")
 
-                            supabase.table('positions').update({
+                            recon_update = {
                                 'status': 'closed',
                                 'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                            }).eq('id', pos['id']).execute()
-                            log_trade_event(supabase, acc['name'], f"Exchange reconciled manual closure of {symbol}.", 'TRADE', 'decay1')
+                            }
+                            if recon_exit_price > 0:
+                                recon_update['exit_price'] = recon_exit_price
+                            supabase.table('positions').update(recon_update).eq('id', pos['id']).execute()
+                            log_trade_event(supabase, acc['name'], f"Exchange reconciled closure of {symbol} at {recon_exit_price if recon_exit_price > 0 else 'N/A'} (SL/TP/Manual).", 'TRADE', 'decay1')
                         except Exception as db_err:
                             print(f"Failed to update db status for closed option {symbol}: {db_err}")
                         continue
@@ -694,6 +706,9 @@ def monitor_positions_loop(supabase: Client):
                                     reduce_only=True
                                 )
                                 
+                                # Capture actual exit fill price from exchange
+                                exit_fill_price = trading_client.get_exit_fill_price(product_id=prod_id)
+                                
                                 # Cancel all resting orders/brackets to avoid false orders later
                                 try:
                                     trading_client.cancel_all_orders(product_id=prod_id)
@@ -701,26 +716,34 @@ def monitor_positions_loop(supabase: Client):
                                 except Exception as cancel_err:
                                     print(f"Notice: Failed to cancel resting orders for {symbol}: {cancel_err}")
                                 
-                                supabase.table('positions').update({
+                                close_update = {
                                     'status': 'closed',
                                     'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                                }).eq('id', pos['id']).execute()
+                                }
+                                if exit_fill_price > 0:
+                                    close_update['exit_price'] = exit_fill_price
+                                supabase.table('positions').update(close_update).eq('id', pos['id']).execute()
                                 
-                                log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} on exchange.", 'TRADE', 'decay1')
+                                log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} on exchange at {exit_fill_price if exit_fill_price > 0 else 'N/A'}.", 'TRADE', 'decay1')
                             except Exception as e:
                                 err_str = str(e)
                                 if "no_position_for_reduce_only" in err_str:
                                     log_trade_event(supabase, acc['name'], f"Position {symbol} already closed on exchange (no_position_for_reduce_only). Updating status in DB...", 'INFO', 'decay1')
                                     try:
+                                        # Try to still fetch the fill price even in this case
+                                        already_closed_price = trading_client.get_exit_fill_price(product_id=prod_id)
                                         # Cancel all resting orders/brackets anyway
                                         try:
                                             trading_client.cancel_all_orders(product_id=prod_id)
                                         except Exception:
                                             pass
-                                        supabase.table('positions').update({
+                                        already_closed_update = {
                                             'status': 'closed',
                                             'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                                        }).eq('id', pos['id']).execute()
+                                        }
+                                        if already_closed_price > 0:
+                                            already_closed_update['exit_price'] = already_closed_price
+                                        supabase.table('positions').update(already_closed_update).eq('id', pos['id']).execute()
                                     except Exception as db_err:
                                         print(f"Failed to update db status for closed option {symbol}: {db_err}")
                                 else:

@@ -386,3 +386,38 @@ class DeltaClient:
             print(f"Notice: Failed to clear pending conditional orders list: {e}")
             
         return res
+
+    def get_fills(self, product_id: Optional[int] = None, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Fetches the most recent trade fills (executions) for the account.
+        Optionally filter by product_id. Returns the latest `limit` fills.
+        Use this to get the actual fill/execution price after placing a market order.
+        """
+        query_params: Dict[str, Any] = {}
+        if product_id is not None:
+            query_params['product_id'] = int(product_id)
+        try:
+            result = self.request('GET', '/v2/fills', query_params=query_params)
+            if isinstance(result, list):
+                return result[:limit]
+            return []
+        except Exception as e:
+            print(f"Notice: Failed to fetch fills: {e}")
+            return []
+
+    def get_exit_fill_price(self, product_id: int) -> float:
+        """
+        Fetches the most recent buy-side fill price for the given product_id.
+        Useful for capturing the actual exit execution price after closing a short position via market order.
+        Returns 0.0 if no fill is found.
+        """
+        import time as _time
+        # Brief wait to let the exchange record the fill
+        _time.sleep(0.5)
+        fills = self.get_fills(product_id=product_id, limit=10)
+        for fill in fills:
+            if str(fill.get('product_id', '')) == str(product_id) and fill.get('side', '').lower() == 'buy':
+                price = fill.get('fill_price') or fill.get('price')
+                if price:
+                    return float(price)
+        return 0.0
