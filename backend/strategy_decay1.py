@@ -146,6 +146,34 @@ def log_trade_event(supabase: Client, account_name: str, message: str, level: st
     except Exception as e:
         print(f"Failed to write log to database: {e}")
 
+def safe_close_position(supabase: Client, position_id: str, exit_price: float = 0.0):
+    """
+    Updates a position to 'closed' status in Supabase.
+    Tries to include exit_price; if the column doesn't exist yet (PGRST204),
+    falls back to updating without it so the position always gets marked closed.
+    """
+    update_payload = {
+        'status': 'closed',
+        'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }
+    if exit_price > 0:
+        update_payload['exit_price'] = exit_price
+
+    try:
+        supabase_retry(lambda: supabase.table('positions').update(update_payload).eq('id', position_id).execute())
+    except Exception as e:
+        err_str = str(e)
+        # If the exit_price column doesn't exist in Supabase schema yet, retry without it
+        if 'exit_price' in err_str and ('PGRST204' in err_str or 'schema cache' in err_str):
+            print(f"Notice: exit_price column not found in DB schema — closing without it. Add column: ALTER TABLE positions ADD COLUMN IF NOT EXISTS exit_price DOUBLE PRECISION;")
+            fallback_payload = {
+                'status': 'closed',
+                'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
+            }
+            supabase_retry(lambda: supabase.table('positions').update(fallback_payload).eq('id', position_id).execute())
+        else:
+            raise e
+
 
 def execute_decay1_entry(supabase: Client):
     """
@@ -535,14 +563,8 @@ def execute_decay1_exit(supabase: Client):
                 except Exception as cancel_err:
                     print(f"Notice: Failed to cancel resting orders for time-exited leg {pos['symbol']}: {cancel_err}")
                 
-                # Update Supabase Status with actual exit price
-                update_payload = {
-                    'status': 'closed',
-                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                }
-                if exit_fill_price > 0:
-                    update_payload['exit_price'] = exit_fill_price
-                supabase.table('positions').update(update_payload).eq('id', pos['id']).execute()
+                # Update Supabase Status with actual exit price (safe fallback if column missing)
+                safe_close_position(supabase, pos['id'], exit_fill_price)
                 
                 log_trade_event(supabase, acc['name'], f"Time exit triggered. Closed Short Strangle leg: {pos['symbol']} at {exit_fill_price if exit_fill_price > 0 else 'N/A'}", 'TRADE', 'decay1')
         except Exception as e:
@@ -655,13 +677,7 @@ def monitor_positions_loop(supabase: Client):
                             except Exception as cancel_err:
                                 print(f"Notice: Failed to cancel resting orders for reconciled {symbol}: {cancel_err}")
 
-                            recon_update = {
-                                'status': 'closed',
-                                'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                            }
-                            if recon_exit_price > 0:
-                                recon_update['exit_price'] = recon_exit_price
-                            supabase.table('positions').update(recon_update).eq('id', pos['id']).execute()
+                            safe_close_position(supabase, pos['id'], recon_exit_price)
                             log_trade_event(supabase, acc['name'], f"Exchange reconciled closure of {symbol} at {recon_exit_price if recon_exit_price > 0 else 'N/A'} (SL/TP/Manual).", 'TRADE', 'decay1')
                         except Exception as db_err:
                             print(f"Failed to update db status for closed option {symbol}: {db_err}")
@@ -716,13 +732,7 @@ def monitor_positions_loop(supabase: Client):
                                 except Exception as cancel_err:
                                     print(f"Notice: Failed to cancel resting orders for {symbol}: {cancel_err}")
                                 
-                                close_update = {
-                                    'status': 'closed',
-                                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                                }
-                                if exit_fill_price > 0:
-                                    close_update['exit_price'] = exit_fill_price
-                                supabase.table('positions').update(close_update).eq('id', pos['id']).execute()
+                                safe_close_position(supabase, pos['id'], exit_fill_price)
                                 
                                 log_trade_event(supabase, acc['name'], f"Successfully closed {symbol} on exchange at {exit_fill_price if exit_fill_price > 0 else 'N/A'}.", 'TRADE', 'decay1')
                             except Exception as e:
@@ -737,13 +747,7 @@ def monitor_positions_loop(supabase: Client):
                                             trading_client.cancel_all_orders(product_id=prod_id)
                                         except Exception:
                                             pass
-                                        already_closed_update = {
-                                            'status': 'closed',
-                                            'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                                        }
-                                        if already_closed_price > 0:
-                                            already_closed_update['exit_price'] = already_closed_price
-                                        supabase.table('positions').update(already_closed_update).eq('id', pos['id']).execute()
+                                        safe_close_position(supabase, pos['id'], already_closed_price)
                                     except Exception as db_err:
                                         print(f"Failed to update db status for closed option {symbol}: {db_err}")
                                 else:

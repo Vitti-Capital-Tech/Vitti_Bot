@@ -10,7 +10,8 @@ from strategy_decay1 import (
     select_strangle_strikes,
     log_trade_event,
     supabase_retry,
-    get_contract_multiplier
+    get_contract_multiplier,
+    safe_close_position
 )
 
 def execute_decay2_entry(supabase: Client):
@@ -486,14 +487,8 @@ def execute_decay2_exit(supabase: Client):
                 except Exception as cancel_err:
                     print(f"Notice: Failed to cancel resting orders for time-exited leg {pos['symbol']}: {cancel_err}")
                 
-                # Update Supabase Status with actual exit price
-                update_payload = {
-                    'status': 'closed',
-                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                }
-                if exit_fill_price > 0:
-                    update_payload['exit_price'] = exit_fill_price
-                supabase.table('positions').update(update_payload).eq('id', pos['id']).execute()
+                # Update Supabase Status with actual exit price (safe fallback if column missing)
+                safe_close_position(supabase, pos['id'], exit_fill_price)
                 
                 log_trade_event(supabase, acc['name'], f"Time exit triggered. Closed Short Strangle leg: {pos['symbol']} at {exit_fill_price if exit_fill_price > 0 else 'N/A'}", 'TRADE', 'decay2')
         except Exception as e:
@@ -599,10 +594,7 @@ def monitor_positions_loop_decay2(supabase: Client):
                         
                         if is_paper:
                             try:
-                                supabase.table('positions').update({
-                                        'status': 'closed',
-                                        'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                                }).eq('id', pos['id']).execute()
+                                safe_close_position(supabase, pos['id'])
                                 log_trade_event(supabase, acc['name'], f"Decay2: Successfully closed simulated leg {symbol} (Paper).", 'TRADE', 'decay2')
                             except Exception as db_err:
                                 print(f"Failed to update db status for simulated Decay2 leg {symbol}: {db_err}")
@@ -635,13 +627,7 @@ def monitor_positions_loop_decay2(supabase: Client):
                                 print(f"Notice: Failed to cancel resting orders for {symbol}: {cancel_err}")
                                     
                             try:
-                                close_update = {
-                                    'status': 'closed',
-                                    'closed_at': datetime.datetime.now(datetime.timezone.utc).isoformat()
-                                }
-                                if exit_fill_price > 0:
-                                    close_update['exit_price'] = exit_fill_price
-                                supabase.table('positions').update(close_update).eq('id', pos['id']).execute()
+                                safe_close_position(supabase, pos['id'], exit_fill_price)
                                 log_trade_event(supabase, acc['name'], f"Decay2: Closed leg {symbol} at {exit_fill_price if exit_fill_price > 0 else 'N/A'}.", 'TRADE', 'decay2')
                             except Exception as db_err:
                                 print(f"Failed to update db status for Decay2 leg {symbol}: {db_err}")
