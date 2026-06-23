@@ -42,6 +42,7 @@ export default function App() {
   const [logs, setLogs] = useState([])
   const [historyPositions, setHistoryPositions] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [pnlMode, setPnlMode] = useState('today') // 'today' | 'all'
   
   const [toasts, setToasts] = useState([])
   const [lastLogId, setLastLogId] = useState(null)
@@ -151,6 +152,14 @@ export default function App() {
           .or(`status.eq.open,and(status.eq.closed,created_at.gte.${todayStart.toISOString()})`)
           .order('created_at', { ascending: false })
         if (pos.data) setPositions(pos.data)
+        
+        // 3b. Always fetch closed positions so KPI realized P&L works on all tabs
+        const closedPos = await supabase
+          .from('positions')
+          .select('*, accounts(name, env)')
+          .eq('status', 'closed')
+          .order('closed_at', { ascending: false })
+        if (closedPos.data) setHistoryPositions(closedPos.data)
         
         // 4. Fetch Logs
         const lg = await supabase.from('trade_logs').select('*').order('created_at', { ascending: false }).limit(200)
@@ -434,6 +443,33 @@ export default function App() {
   // Calculate live unrealized PnL summary
   const activePositions = positions.filter(p => p.status === 'open')
   const totalPnL = activePositions.reduce((acc, pos) => acc + (parseFloat(pos.pnl) || 0.0), 0.0)
+
+  // Helper: compute realized P&L for a closed short position
+  // Short P&L = (entry_price - exit_price) * size * multiplier
+  // Multiplier is 0.001 BTC for BTC options (contract size)
+  const getContractMultiplier = (symbol) => {
+    if (!symbol) return 0.001
+    if (symbol.includes('BTC')) return 0.001
+    if (symbol.includes('ETH')) return 0.01
+    return 0.001
+  }
+  const calcRealizedPnL = (pos) => {
+    const entry = parseFloat(pos.entry_price) || 0
+    const exit = parseFloat(pos.exit_price) || 0
+    if (exit === 0) return parseFloat(pos.pnl) || 0 // fallback to stored pnl if no exit price yet
+    const size = parseInt(pos.size) || 1
+    const multiplier = getContractMultiplier(pos.symbol)
+    return (entry - exit) * size * multiplier
+  }
+
+  // Realized P&L calculations from closed positions history
+  const todayStartMs = new Date().setHours(0, 0, 0, 0)
+  const todayClosedPositions = historyPositions.filter(p => {
+    if (!p.closed_at) return false
+    return new Date(p.closed_at).getTime() >= todayStartMs
+  })
+  const todayRealizedPnL = todayClosedPositions.reduce((acc, pos) => acc + calcRealizedPnL(pos), 0.0)
+  const allTimeRealizedPnL = historyPositions.reduce((acc, pos) => acc + calcRealizedPnL(pos), 0.0)
 
   // Group positions by Account ID + Strategy Name to render consolidated Strangles
   const getGroupedStrangles = () => {
@@ -743,7 +779,7 @@ export default function App() {
         {/* KPI INSTITUTIONAL METRICS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
 
-          {/* Card 1 — Unrealized PnL */}
+          {/* Card 1 — Realized P&L Toggle (Today / All-Time) */}
           <div className="glass-panel kpi-card-cyan rounded-2xl p-6 relative border border-white/5 bg-[#0b0f1d] transition-all duration-300">
             {/* Faint background icon container */}
             <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none select-none">
@@ -757,28 +793,59 @@ export default function App() {
                 <div className="w-6 h-6 rounded-lg bg-cyan-500/10 border border-cyan-500/15 flex items-center justify-center">
                   <DollarSign className="w-3 h-3 text-cyan-400" />
                 </div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">Unrealized PnL</p>
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest font-sans">
+                  {pnlMode === 'today' ? "Today's P&L" : 'All-Time P&L'}
+                </p>
                 <div className="tooltip-trigger tooltip-below">
                   <Info className="w-3 h-3 text-gray-600 hover:text-cyan-400 cursor-help transition-colors" />
-                  <span className="tooltip-content">Real-time consolidated options strangle yield</span>
+                  <span className="tooltip-content">
+                    {pnlMode === 'today'
+                      ? "Realized P&L from trades closed today (entry − exit × size × multiplier)"
+                      : "Realized P&L across all closed trades"}
+                  </span>
                 </div>
               </div>
-              <span className={`text-[9px] px-2 py-0.5 rounded-md font-extrabold tracking-wider border ${
-                totalPnL >= 0
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-              }`}>
-                {totalPnL >= 0 ? 'PROFIT' : 'DRAWDOWN'}
-              </span>
+              {/* Toggle button */}
+              <button
+                onClick={() => setPnlMode(prev => prev === 'today' ? 'all' : 'today')}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-cyan-500/10 hover:border-cyan-500/20 transition-all duration-200 group"
+                title={pnlMode === 'today' ? 'Switch to All-Time P&L' : 'Switch to Today\'s P&L'}
+              >
+                <RefreshCw className="w-2.5 h-2.5 text-gray-500 group-hover:text-cyan-400 transition-colors" />
+                <span className="text-[8px] font-extrabold uppercase tracking-widest text-gray-500 group-hover:text-cyan-400 transition-colors">
+                  {pnlMode === 'today' ? 'All' : 'Today'}
+                </span>
+              </button>
             </div>
             {/* Big number */}
-            <h3 className={`text-[2rem] font-black mt-4 tracking-tight font-sans leading-none ${
-              totalPnL >= 0
-              ? 'text-emerald-400 drop-shadow-[0_0_18px_rgba(16,185,129,0.25)]'
-              : 'text-rose-400 drop-shadow-[0_0_18px_rgba(244,63,94,0.25)]'
-            }`}>
-              {totalPnL >= 0 ? '+' : ''}{formatAmount(totalPnL, 4)}
-            </h3>
+            {(() => {
+              const displayPnL = pnlMode === 'today' ? todayRealizedPnL : allTimeRealizedPnL
+              return (
+                <>
+                  <h3 className={`text-[2rem] font-black mt-4 tracking-tight font-sans leading-none ${
+                    displayPnL >= 0
+                    ? 'text-emerald-400 drop-shadow-[0_0_18px_rgba(16,185,129,0.25)]'
+                    : 'text-rose-400 drop-shadow-[0_0_18px_rgba(244,63,94,0.25)]'
+                  }`}>
+                    {displayPnL >= 0 ? '+' : ''}{formatAmount(displayPnL, 4)}
+                  </h3>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className={`text-[9px] px-2 py-0.5 rounded-md font-extrabold tracking-wider border ${
+                      displayPnL >= 0
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                    }`}>
+                      {displayPnL >= 0 ? 'PROFIT' : 'LOSS'}
+                    </span>
+                    <span className="text-[8px] text-gray-600 font-mono">
+                      {pnlMode === 'today'
+                        ? `${todayClosedPositions.length} leg${todayClosedPositions.length !== 1 ? 's' : ''} closed today`
+                        : `${historyPositions.length} total leg${historyPositions.length !== 1 ? 's' : ''}`}
+                    </span>
+                  </div>
+                </>
+              )
+            })()}
           </div>
 
           {/* Card 2 — Active Strangle Pairs */}
@@ -1352,8 +1419,9 @@ export default function App() {
                                         {strat.stranglePairs.map((pair, idx) => {
                                           const callEntry = parseFloat(pair.call.entry_price) || 0
                                           const putEntry = parseFloat(pair.put.entry_price) || 0
-                                          const callExit = parseFloat(pair.call.mark_price) || 0
-                                          const putExit = parseFloat(pair.put.mark_price) || 0
+                                          // Use actual exit_price if available, else fall back to mark_price
+                                          const callExit = parseFloat(pair.call.exit_price) || parseFloat(pair.call.mark_price) || 0
+                                          const putExit = parseFloat(pair.put.exit_price) || parseFloat(pair.put.mark_price) || 0
                                           
                                           const callPnL = parseFloat(pair.call.pnl) || 0
                                           const putPnL = parseFloat(pair.put.pnl) || 0
@@ -1414,7 +1482,8 @@ export default function App() {
                                         {strat.unpaired.map((leg, idx) => {
                                           const isCall = leg.symbol.startsWith('C-')
                                           const entryPrice = parseFloat(leg.entry_price) || 0
-                                          const exitPrice = parseFloat(leg.mark_price) || 0
+                                          // Use actual exit_price if available, else fall back to mark_price
+                                          const exitPrice = parseFloat(leg.exit_price) || parseFloat(leg.mark_price) || 0
                                           const legPnL = parseFloat(leg.pnl) || 0
 
                                           return (
