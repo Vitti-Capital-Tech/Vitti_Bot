@@ -805,15 +805,38 @@ export default function App() {
                   </span>
                 </div>
               </div>
-              {/* Toggle button */}
+              {/* Sliding pill toggle — TODAY / ALL */}
               <button
                 onClick={() => setPnlMode(prev => prev === 'today' ? 'all' : 'today')}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-cyan-500/10 hover:border-cyan-500/20 transition-all duration-200 group"
-                title={pnlMode === 'today' ? 'Switch to All-Time P&L' : 'Switch to Today\'s P&L'}
+                title={pnlMode === 'today' ? 'Switch to All-Time P&L' : "Switch to Today's P&L"}
+                className="relative flex items-center rounded-full p-0.5 cursor-pointer select-none"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  width: '72px',
+                  height: '22px',
+                }}
               >
-                <RefreshCw className="w-2.5 h-2.5 text-gray-500 group-hover:text-cyan-400 transition-colors" />
-                <span className="text-[8px] font-extrabold uppercase tracking-widest text-gray-500 group-hover:text-cyan-400 transition-colors">
-                  {pnlMode === 'today' ? 'All' : 'Today'}
+                {/* Sliding glowing indicator */}
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    left: pnlMode === 'today' ? '2px' : 'calc(50% + 1px)',
+                    width: 'calc(50% - 3px)',
+                    height: 'calc(100% - 4px)',
+                    borderRadius: '9999px',
+                    background: 'linear-gradient(135deg, rgba(6,182,212,0.85), rgba(99,102,241,0.7))',
+                    boxShadow: '0 0 8px rgba(6,182,212,0.5)',
+                    transition: 'left 0.25s cubic-bezier(0.4,0,0.2,1)',
+                  }}
+                />
+                {/* Labels */}
+                <span style={{ position: 'relative', width: '50%', textAlign: 'center', fontSize: '8px', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', transition: 'color 0.2s', color: pnlMode === 'today' ? '#fff' : 'rgba(156,163,175,0.7)', zIndex: 1 }}>
+                  Today
+                </span>
+                <span style={{ position: 'relative', width: '50%', textAlign: 'center', fontSize: '8px', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase', transition: 'color 0.2s', color: pnlMode === 'all' ? '#fff' : 'rgba(156,163,175,0.7)', zIndex: 1 }}>
+                  All
                 </span>
               </button>
             </div>
