@@ -650,7 +650,7 @@ export default function App() {
             }
           })
           
-          const strategyPnL = stratPosList.reduce((acc, p) => acc + (parseFloat(p.pnl) || 0.0), 0.0)
+          const strategyPnL = stratPosList.reduce((acc, p) => acc + calcRealizedPnL(p), 0.0)
           
           return {
             strategyName,
@@ -660,7 +660,7 @@ export default function App() {
           }
         })
         
-        const totalAccountPnL = accPosList.reduce((acc, p) => acc + (parseFloat(p.pnl) || 0.0), 0.0)
+        const totalAccountPnL = accPosList.reduce((acc, p) => acc + calcRealizedPnL(p), 0.0)
         
         return {
           accountId: accId,
@@ -1446,8 +1446,8 @@ export default function App() {
                                           const callExit = parseFloat(pair.call.exit_price) || parseFloat(pair.call.mark_price) || 0
                                           const putExit = parseFloat(pair.put.exit_price) || parseFloat(pair.put.mark_price) || 0
                                           
-                                          const callPnL = parseFloat(pair.call.pnl) || 0
-                                          const putPnL = parseFloat(pair.put.pnl) || 0
+                                          const callPnL = calcRealizedPnL(pair.call)
+                                          const putPnL = calcRealizedPnL(pair.put)
                                           
                                           return (
                                             <div key={idx} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1507,7 +1507,7 @@ export default function App() {
                                           const entryPrice = parseFloat(leg.entry_price) || 0
                                           // Use actual exit_price if available, else fall back to mark_price
                                           const exitPrice = parseFloat(leg.exit_price) || parseFloat(leg.mark_price) || 0
-                                          const legPnL = parseFloat(leg.pnl) || 0
+                                          const legPnL = calcRealizedPnL(leg)
 
                                           return (
                                             <div key={idx} className="bg-black/10 p-4 rounded-xl border border-white/[0.02] flex flex-col gap-2 relative">
