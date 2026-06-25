@@ -49,13 +49,18 @@ def balance_update_loop(supabase: Client):
                     client = DeltaClient(acc['api_key'], acc['api_secret'], client_env)
                     try:
                         balances = client.get_balances()
-                        # Find USD balance
+                        # Find USD balance and check for balance_inr
                         usd_bal = None
+                        inr_bal = None
                         for b in balances:
                             if b.get('asset_symbol') == 'USD':
                                 usd_bal = float(b.get('balance', 0.0))
+                                inr_bal = float(b.get('balance_inr', 0.0))
                                 break
-                        if usd_bal is not None:
+                        if inr_bal is not None and inr_bal > 0:
+                            # Convert INR balance to USD using Delta India's UI rate (approx 86.20)
+                            balance = inr_bal / 86.20
+                        elif usd_bal is not None:
                             balance = usd_bal
                         elif balances:
                             balance = float(balances[0].get('balance', 0.0))
