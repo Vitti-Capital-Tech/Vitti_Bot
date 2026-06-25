@@ -95,10 +95,12 @@ export default function App() {
   })
 
   // Format currency value based on USD / INR toggle
-  const formatAmount = (val, decimals = 4) => {
+  // inrOverride: pass the stored INR balance directly (from Delta API) when available
+  const formatAmount = (val, decimals = 4, inrOverride = null) => {
     const numericVal = parseFloat(val) || 0.0
     if (currency === 'INR') {
-      const inrVal = numericVal * 85
+      // Use the Delta-provided INR balance if available, otherwise convert at 85
+      const inrVal = inrOverride !== null ? parseFloat(inrOverride) || (numericVal * 85) : numericVal * 85
       return `₹${inrVal.toFixed(decimals === 4 ? 2 : decimals)}`
     }
     return `$${numericVal.toFixed(decimals)}`
@@ -525,11 +527,13 @@ export default function App() {
       const nameParts = (accDetails.name || '').split('|')
       const baseName = nameParts[0]
       const actualBalance = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
+      const actualBalanceInr = nameParts[2] ? parseFloat(nameParts[2]) : null
 
       return {
         accountId: accId,
         accountName: baseName,
         accountBalance: actualBalance,
+        accountBalanceInr: actualBalanceInr,
         env: accDetails.env,
         lots: accDetails.lots || 1,
         strategyName,
@@ -550,20 +554,27 @@ export default function App() {
   const getAccountLiveEquity = (account) => {
     const nameParts = (account.name || '').split('|')
     const cashBal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
-    // Subtract open positions mark value (what you owe to buy back the option)
-    const accOpenPositions = positions.filter(p => p.account_id === account.id && p.status === 'open')
-    const openMarkValue = accOpenPositions.reduce((sum, p) => {
-      const mark = parseFloat(p.mark_price) || 0.0
-      const size = parseInt(p.size) || 0
-      const multiplier = getContractMultiplier(p.symbol)
-      return sum + (mark * size * multiplier)
-    }, 0.0)
-    return cashBal - openMarkValue
+    // Delta Exchange's balance field already reflects real-time equity including open positions.
+    // Do NOT subtract mark value here — that would double-count.
+    return cashBal
+  }
+  const getAccountLiveEquityInr = (account) => {
+    const nameParts = (account.name || '').split('|')
+    // nameParts[2] is the INR balance stored directly from Delta API
+    return nameParts[2] ? parseFloat(nameParts[2]) : null
   }
 
   const totalActiveBalance = accounts
     .filter(a => a.is_active)
     .reduce((sum, acc) => sum + getAccountLiveEquity(acc), 0.0)
+
+  // Sum of INR balances stored from Delta API for active accounts (may be null if not fetched yet)
+  const totalActiveBalanceInrParts = accounts
+    .filter(a => a.is_active)
+    .map(acc => getAccountLiveEquityInr(acc))
+  const totalActiveBalanceInr = totalActiveBalanceInrParts.every(v => v !== null)
+    ? totalActiveBalanceInrParts.reduce((sum, v) => sum + v, 0.0)
+    : null
 
   // Determine daemon health status: check if we received logs within last 5 minutes
   const isDaemonHealthy = () => {
@@ -616,7 +627,7 @@ export default function App() {
       const accounts = Object.keys(accountGroups).map(accId => {
         const accPosList = accountGroups[accId]
         const dbName = accPosList[0].accounts?.name || 'Linked Account'
-        const [accName, accBalance] = dbName.split('|')
+        const [accName, accBalance, accBalanceInr] = dbName.split('|')
         const accEnv = accPosList[0].accounts?.env || 'production'
         
         // Group by strategy inside the account
@@ -676,6 +687,7 @@ export default function App() {
           accountId: accId,
           accountName: accName,
           accountBalance: accBalance ? parseFloat(accBalance) : null,
+          accountBalanceInr: accBalanceInr ? parseFloat(accBalanceInr) : null,
           env: accEnv,
           strategies,
           totalAccountPnL
@@ -981,6 +993,7 @@ export default function App() {
                 const nameParts = (acc.name || '').split('|')
                 const baseName = nameParts[0]
                 const bal = getAccountLiveEquity(acc)
+                const balInr = getAccountLiveEquityInr(acc)
                 return (
                   <div key={acc.id} className="flex items-center justify-between border-b border-white/[0.02] last:border-0 pb-2 last:pb-0 gap-4">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -991,7 +1004,7 @@ export default function App() {
                        </span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-mono font-bold text-cyan-400">{formatAmount(bal, 2)}</span>
+                      <span className="text-xs font-mono font-bold text-cyan-400">{formatAmount(bal, 2, balInr)}</span>
                       <span className={`text-[8px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 rounded border ${
                         acc.is_active
                         ? 'text-emerald-400 bg-emerald-500/8 border-emerald-500/15'
@@ -1147,7 +1160,7 @@ export default function App() {
                                   <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Account Balance</p>
                                     <p className="text-sm md:text-base font-black text-white mt-1 font-mono">
-                                      {formatAmount(group.accountBalance - (markSum * (parseInt(pair.call.size) || 1) * getContractMultiplier(pair.call.symbol)), 2)}
+                                      {formatAmount(group.accountBalance, 2, group.accountBalanceInr)}
                                     </p>
                                   </div>
                                 </div>
@@ -1330,7 +1343,7 @@ export default function App() {
                                         </div>
                                         <div className="flex flex-col">
                                           <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Account Balance</span>
-                                          <span className="text-white text-xs mt-1 font-bold font-mono">{formatAmount(group.accountBalance - ((parseFloat(leg.mark_price) || 0) * (parseInt(leg.size) || 1) * getContractMultiplier(leg.symbol)), 2)}</span>
+                                          <span className="text-white text-xs mt-1 font-bold font-mono">{formatAmount(group.accountBalance, 2, group.accountBalanceInr)}</span>
                                         </div>
                                       </div>
                                     </div>
@@ -1413,7 +1426,7 @@ export default function App() {
                                       </span>
                                       {account.accountBalance !== null && (
                                         <span className="text-[7px] font-extrabold uppercase tracking-widest px-1.5 py-0.5 border rounded bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                          Bal: {formatAmount(account.accountBalance, 2)}
+                                          Bal: {formatAmount(account.accountBalance, 2, account.accountBalanceInr)}
                                         </span>
                                       )}
                                     </div>

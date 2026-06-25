@@ -39,40 +39,38 @@ def balance_update_loop(supabase: Client):
                 # Get base name by stripping any existing balance suffix
                 base_name = name.split('|')[0]
                 
-                balance = 0.0
+                usd_balance = 0.0
+                inr_balance = 0.0
                 is_paper = (acc['env'] == 'paper')
                 
                 if is_paper:
-                    balance = 10000.0  # Paper starting capital
+                    usd_balance = 10000.0  # Paper starting capital
+                    inr_balance = 0.0
                 else:
                     client_env = 'production' if acc['env'] == 'paper' else acc['env']
                     client = DeltaClient(acc['api_key'], acc['api_secret'], client_env)
                     try:
                         balances = client.get_balances()
-                        # Find USD balance and check for balance_inr
-                        usd_bal = None
-                        inr_bal = None
+                        # Find USD asset and read both USD balance and INR equivalent directly from API
                         for b in balances:
                             if b.get('asset_symbol') == 'USD':
-                                usd_bal = float(b.get('balance', 0.0))
-                                inr_bal = float(b.get('balance_inr', 0.0))
+                                usd_balance = float(b.get('balance', 0.0))
+                                inr_balance = float(b.get('balance_inr', 0.0))
                                 break
-                        if inr_bal is not None and inr_bal > 0:
-                            # Convert INR balance to USD using Delta India's UI rate (approx 86.20)
-                            balance = inr_bal / 86.20
-                        elif usd_bal is not None:
-                            balance = usd_bal
-                        elif balances:
-                            balance = float(balances[0].get('balance', 0.0))
+                        # Fallback: use first balance entry if no USD asset found
+                        if usd_balance == 0.0 and balances:
+                            usd_balance = float(balances[0].get('balance', 0.0))
+                            inr_balance = float(balances[0].get('balance_inr', 0.0))
                     except Exception as e:
                         print(f"Error fetching balance for {base_name}: {e}")
                         continue  # Skip updating if API call failed
                 
-                # Format new name
-                new_name = f"{base_name}|{balance:.2f}"
+                # Format new name as BaseName|USD|INR
+                new_name = f"{base_name}|{usd_balance:.2f}|{inr_balance:.2f}"
                 if new_name != name:
                     try:
                         supabase.table('accounts').update({'name': new_name}).eq('id', acc['id']).execute()
+                        print(f"Balance updated for {base_name}: ${usd_balance:.2f} / ₹{inr_balance:.2f}")
                     except Exception as e:
                         print(f"Error updating name with balance for {base_name}: {e}")
                         
