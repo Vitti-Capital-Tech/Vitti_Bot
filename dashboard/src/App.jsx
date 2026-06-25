@@ -547,13 +547,18 @@ export default function App() {
   // Calculate Account metrics
   const activeAccountsCount = accounts.filter(a => a.is_active).length
   const totalAccountsCount = accounts.length
+  const getAccountLiveEquity = (account) => {
+    const nameParts = (account.name || '').split('|')
+    const cashBal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
+    // Sum open positions PnL for this account
+    const accOpenPositions = positions.filter(p => p.account_id === account.id && p.status === 'open')
+    const accPnL = accOpenPositions.reduce((sum, p) => sum + (parseFloat(p.pnl) || 0.0), 0.0)
+    return cashBal + accPnL
+  }
+
   const totalActiveBalance = accounts
     .filter(a => a.is_active)
-    .reduce((sum, acc) => {
-      const nameParts = (acc.name || '').split('|')
-      const bal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
-      return sum + bal
-    }, 0.0)
+    .reduce((sum, acc) => sum + getAccountLiveEquity(acc), 0.0)
 
   // Determine daemon health status: check if we received logs within last 5 minutes
   const isDaemonHealthy = () => {
@@ -970,7 +975,7 @@ export default function App() {
               {accounts.map(acc => {
                 const nameParts = (acc.name || '').split('|')
                 const baseName = nameParts[0]
-                const bal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
+                const bal = getAccountLiveEquity(acc)
                 return (
                   <div key={acc.id} className="flex items-center justify-between border-b border-white/[0.02] last:border-0 pb-2 last:pb-0 gap-4">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -1680,7 +1685,7 @@ export default function App() {
                                   <div className="flex flex-col text-right">
                                     <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Available Balance</span>
                                     <span className="text-white font-mono text-sm font-extrabold mt-0.5">
-                                      {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
+                                      {formatAmount(getAccountLiveEquity(acc), 2)}
                                     </span>
                                   </div>
                                 </div>
@@ -1781,7 +1786,7 @@ export default function App() {
                                   <div className="flex flex-col text-right">
                                     <span className="text-[7px] text-gray-500 uppercase font-sans tracking-widest">Available Balance</span>
                                     <span className="text-white font-mono text-sm font-extrabold mt-0.5">
-                                      {formatAmount((acc.name || '').split('|')[1] ? parseFloat((acc.name || '').split('|')[1]) : 10000.0, 2)}
+                                      {formatAmount(getAccountLiveEquity(acc), 2)}
                                     </span>
                                   </div>
                                 </div>
