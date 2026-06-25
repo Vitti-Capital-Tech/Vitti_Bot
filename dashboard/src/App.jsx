@@ -550,10 +550,15 @@ export default function App() {
   const getAccountLiveEquity = (account) => {
     const nameParts = (account.name || '').split('|')
     const cashBal = nameParts[1] ? parseFloat(nameParts[1]) : 10000.0
-    // Sum open positions PnL for this account
+    // Subtract open positions mark value (what you owe to buy back the option)
     const accOpenPositions = positions.filter(p => p.account_id === account.id && p.status === 'open')
-    const accPnL = accOpenPositions.reduce((sum, p) => sum + (parseFloat(p.pnl) || 0.0), 0.0)
-    return cashBal + accPnL
+    const openMarkValue = accOpenPositions.reduce((sum, p) => {
+      const mark = parseFloat(p.mark_price) || 0.0
+      const size = parseInt(p.size) || 0
+      const multiplier = getContractMultiplier(p.symbol)
+      return sum + (mark * size * multiplier)
+    }, 0.0)
+    return cashBal - openMarkValue
   }
 
   const totalActiveBalance = accounts
@@ -1142,7 +1147,7 @@ export default function App() {
                                   <div className="p-4 flex flex-col justify-center md:pl-6">
                                     <p className="text-[9px] text-gray-500 uppercase tracking-widest font-sans font-bold">Account Balance</p>
                                     <p className="text-sm md:text-base font-black text-white mt-1 font-mono">
-                                      {formatAmount(group.accountBalance + pairPnL, 2)}
+                                      {formatAmount(group.accountBalance - (markSum * (parseInt(pair.call.size) || 1) * getContractMultiplier(pair.call.symbol)), 2)}
                                     </p>
                                   </div>
                                 </div>
@@ -1325,7 +1330,7 @@ export default function App() {
                                         </div>
                                         <div className="flex flex-col">
                                           <span className="text-[9px] text-gray-500 uppercase font-sans tracking-wider font-semibold">Account Balance</span>
-                                          <span className="text-white text-xs mt-1 font-bold font-mono">{formatAmount(group.accountBalance + legPnL, 2)}</span>
+                                          <span className="text-white text-xs mt-1 font-bold font-mono">{formatAmount(group.accountBalance - ((parseFloat(leg.mark_price) || 0) * (parseInt(leg.size) || 1) * getContractMultiplier(leg.symbol)), 2)}</span>
                                         </div>
                                       </div>
                                     </div>
